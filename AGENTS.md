@@ -1,0 +1,29 @@
+# AGENTS.md — Chain of Stewardship and Operating Rules
+
+Scope: Root — applies to the entire repository.
+
+## Chain of Stewardship Log (append below)
+- For each contribution, append an entry with:
+  - Date/Time, Agent/Human, Tasks performed
+  - Files changed, Validation results (tests/linters)
+  - Rubric scores (1–10 across 15 categories)
+  - Notes/Next actions or Handoff capsule link
+
+Log
+- 2025-10-26T00:00Z | Agent: CodexCLI | Setup planning PRPs; fixed .gitattributes | Docs added; LFS config restored | N/A | Initial plan created
+
+## ACE (Agentic Context Engineering)
+- All non‑trivial changes run through ACE trio (Retriever → Planner → Critic; up to 3 cycles) before merge.
+- Produce citations; update memory/ace_state.jsonl; daily build_logs entries.
+
+## Rubric (see PRPs/RUBRIC.md)
+- Minimum acceptable average: 8.0; any category <7 requires remediation tasks.
+
+## Repository Hygiene
+- Place files per Folder Canon; run orphan scan locally; CI blocks on orphans.
+- Delete dead code or move to /archive/<date>/<ticket>/ with reason.
+
+## Security & Compliance
+- Tool allow‑lists per agent; RBAC enforcement; audit evidence access.
+- Secrets via env/KeyVault; encryption in transit/at rest.
+
