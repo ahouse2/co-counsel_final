@@ -3,25 +3,69 @@ version: 0.1
 
 ## APIs
 - POST /ingest
-  - Body: { sources: [ {type:"local", path:"./data"}, {type:"sharepoint", credRef:"..."} ] }
-  - 202 Accepted; job id returned
+  - Request body
+    ```json
+    {
+      "sources": [
+        {"type": "local", "path": "./data"},
+        {"type": "sharepoint", "credRef": "secret-handle"}
+      ]
+    }
+    ```
+  - Success: **202 Accepted**
+    ```json
+    {"job_id": "uuid", "status": "queued|completed"}
+    ```
+  - Error: **400 Bad Request** when sources missing/invalid; **404 Not Found** for missing local path; **422 Unprocessable Entity** for unsupported source type.
 - GET /query
-  - Params: q (string)
-  - 200: { answer: string, citations: [ {docId, span, url?} ], traces: {vector: [...], graph: [...]}}
+  - Query params: `q` (string, required)
+  - Success: **200 OK**
+    ```json
+    {
+      "answer": "string summary",
+      "citations": [{"docId": "...", "span": "...", "uri": "optional"}],
+      "traces": {
+        "vector": [{"id": "point-id", "score": 0.42, "docId": "..."}],
+        "graph": {
+          "nodes": [{"id": "entity-id", "type": "Entity", "properties": {...}}],
+          "edges": [{"source": "doc", "target": "entity", "type": "MENTIONS", "properties": {...}}]
+        }
+      }
+    }
+    ```
+  - Error: **200 OK** with fallback message when no evidence; **500 Internal Server Error** surfaces unexpected retrieval failures.
 - GET /timeline
-  - 200: { events: [ {id, ts, title, summary, citations: [...] } ] }
+  - Success: **200 OK**
+    ```json
+    {
+      "events": [
+        {"id": "doc::event::0", "ts": "2024-10-26T00:00:00Z", "title": "string", "summary": "string", "citations": ["docId"]}
+      ]
+    }
+    ```
+  - Empty dataset returns an empty `events` array.
 - GET /graph/neighbor
-  - Params: id (entity id)
-  - 200: { nodes: [...], edges: [...] }
- - GET /forensics/document
-   - Params: id (file id)
-   - 200: { hash: {...}, metadata: {...}, structure: {...}, authenticity: {...} }
- - GET /forensics/image
-   - Params: id (file id)
-   - 200: { exif: {...}, ela: {...}, prnu?: {...}, clones?: [...], authenticity_score: number }
- - GET /forensics/financial
-   - Params: id (file id)
-   - 200: { totals: {...}, anomalies: [...], entities: [...], summary: string }
+  - Query params: `id` (required node identifier)
+  - Success: **200 OK**
+    ```json
+    {
+      "nodes": [{"id": "entity::Acme", "type": "Entity", "properties": {"label": "Acme"}}],
+      "edges": [{"source": "docId", "target": "entity::Acme", "type": "MENTIONS", "properties": {"evidence": "Acme"}}]
+    }
+    ```
+  - Error: **404 Not Found** when the requested node is absent.
+- GET /forensics/document
+  - Query params: `id` (document identifier)
+  - Success: **200 OK** with payload `{ "hashes": {...}, "metadata": {...}, "structure": {...}, "authenticity": {...} }`
+  - Error: **404 Not Found** when no artifact recorded.
+- GET /forensics/image
+  - Query params: `id`
+  - Success: **200 OK** returning `{ "metadata": {...}, "ela": {...}, "clones": [...], "authenticity_score": number }`
+  - Error: **404 Not Found** if artifact missing.
+- GET /forensics/financial
+  - Query params: `id`
+  - Success: **200 OK** returning `{ "totals": {...}, "anomalies": [...], "entities": [...], "summary": "..." }`
+  - Error: **404 Not Found** when dataset has not been processed.
 
 ## Data Models (sketch)
 - Document { id, uri, type, metadata }
