@@ -1,4 +1,7 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
-
+pydantic-settings==2.5.2
+neo4j==5.23.1
+qdrant-client==1.9.1
+Pillow==10.4.0
