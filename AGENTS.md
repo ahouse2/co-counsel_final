@@ -27,4 +27,5 @@ Log
 ## Security & Compliance
 - Tool allow‑lists per agent; RBAC enforcement; audit evidence access.
 - Secrets via env/KeyVault; encryption in transit/at rest.
+- 2025-10-27T08:12Z | Agent: ChatGPT | Recast Co-Counsel spec with schema tables, async lifecycle, pagination guidance; authored roadmap | docs/AgentsMD_PRPs_and_AgentMemory/PRPs/PRP_CoCounsel_MSAgents_LlamaIndex_Swarms_spec.md; docs/roadmaps/2025-10-27_co_counsel_spec_update.md | Documentation changes; no automated tests required | Quality ≥9 across rubric; doc-only update
 
