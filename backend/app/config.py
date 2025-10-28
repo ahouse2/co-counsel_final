@@ -30,6 +30,22 @@ class Settings(BaseSettings):
     agent_threads_dir: Path = Field(default=Path("storage/agent_threads"))
     credentials_registry_path: Path | None = Field(default=None)
 
+    security_mtls_ca_path: Path | None = Field(default=None)
+    security_mtls_registry_path: Path | None = Field(default=None)
+    security_mtls_header: str = Field(default="x-client-cert")
+    security_mtls_optional_paths: tuple[str, ...] = Field(default=("/health",))
+    security_mtls_clock_skew: int = Field(default=60)
+
+    security_oauth_jwks_path: Path | None = Field(default=None)
+    security_token_issuer: str | None = Field(default=None)
+    security_token_leeway: int = Field(default=60)
+
+    security_audience_ingest: str = Field(default="co-counsel.ingest")
+    security_audience_query: str = Field(default="co-counsel.query")
+    security_audience_timeline: str = Field(default="co-counsel.timeline")
+    security_audience_graph: str = Field(default="co-counsel.graph")
+    security_audience_forensics: str = Field(default="co-counsel.forensics")
+    security_audience_agents: str = Field(default="co-counsel.agents")
     telemetry_enabled: bool = Field(default=False)
     telemetry_service_name: str = Field(default="cocounsel-backend")
     telemetry_environment: str = Field(default="local")
