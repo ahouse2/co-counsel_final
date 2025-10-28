@@ -7,6 +7,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 from typing import Any, Dict
 
 from uuid import uuid4
@@ -36,6 +37,10 @@ def safe_path(root: Path, name: str, suffix: str = ".json") -> Path:
 
 
 def atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
+    temp_path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    temp_path.replace(path)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
