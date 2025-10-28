@@ -9,6 +9,7 @@ from ..config import get_settings
 from ..storage.document_store import DocumentStore
 from ..utils.text import hashed_embedding
 from ..utils.triples import extract_entities, normalise_entity_id
+from .forensics import ForensicsService, get_forensics_service
 from .graph import GraphEdge, GraphNode, GraphService, get_graph_service
 from .vector import VectorService, get_vector_service
 
@@ -30,9 +31,10 @@ class Citation:
 class Trace:
     vector: List[Dict[str, object]]
     graph: Dict[str, List[Dict[str, object]]]
+    forensics: List[Dict[str, object]]
 
     def to_dict(self) -> Dict[str, object]:
-        return {"vector": self.vector, "graph": self.graph}
+        return {"vector": self.vector, "graph": self.graph, "forensics": self.forensics}
 
 
 class RetrievalService:
@@ -41,11 +43,13 @@ class RetrievalService:
         vector_service: VectorService | None = None,
         graph_service: GraphService | None = None,
         document_store: DocumentStore | None = None,
+        forensics_service: ForensicsService | None = None,
     ) -> None:
         self.settings = get_settings()
         self.vector_service = vector_service or get_vector_service()
         self.graph_service = graph_service or get_graph_service()
         self.document_store = document_store or DocumentStore(self.settings.document_store_dir)
+        self.forensics_service = forensics_service or get_forensics_service()
 
     def query(self, question: str, top_k: int = 5) -> Dict[str, object]:
         query_vector = hashed_embedding(question, self.settings.qdrant_vector_size)
@@ -119,6 +123,7 @@ class RetrievalService:
             }
             for point in results
         ]
+        forensics_trace = self._build_forensics_trace(results)
         node_map: Dict[str, GraphNode] = {}
         edge_bucket: Dict[Tuple[str, str, str, object], GraphEdge] = {}
         relation_statements: List[str] = []
@@ -154,7 +159,58 @@ class RetrievalService:
                 for edge in edge_bucket.values()
             ],
         }
-        return Trace(vector=vector_trace, graph=graph_trace), relation_statements
+        return Trace(vector=vector_trace, graph=graph_trace, forensics=forensics_trace), relation_statements
+
+    def _build_forensics_trace(
+        self, results: List[qmodels.ScoredPoint]
+    ) -> List[Dict[str, object]]:
+        entries: List[Dict[str, object]] = []
+        seen: Set[str] = set()
+        for point in results:
+            payload = point.payload or {}
+            raw_doc = payload.get("doc_id")
+            if raw_doc is None:
+                continue
+            doc_id = str(raw_doc)
+            if doc_id in seen:
+                continue
+            seen.add(doc_id)
+            doc_type = payload.get("type")
+            if doc_type is None:
+                try:
+                    record = self.document_store.read_document(doc_id)
+                except FileNotFoundError:
+                    record = {}
+                doc_type = record.get("type")
+            artifact = self._artifact_name_for_type(doc_type)
+            if artifact is None:
+                continue
+            if not self.forensics_service.report_exists(doc_id, artifact):
+                continue
+            try:
+                report_payload = self.forensics_service.load_artifact(doc_id, artifact)
+            except FileNotFoundError:
+                continue
+            entries.append(
+                {
+                    "document_id": doc_id,
+                    "artifact": artifact,
+                    "schema_version": report_payload.get("schema_version", "unknown"),
+                    "summary": report_payload.get("summary", ""),
+                    "fallback_applied": report_payload.get("fallback_applied", False),
+                }
+            )
+        return entries
+
+    @staticmethod
+    def _artifact_name_for_type(doc_type: str | None) -> str | None:
+        if doc_type in {"text", "document", "note"}:
+            return "document"
+        if doc_type == "image":
+            return "image"
+        if doc_type == "financial":
+            return "financial"
+        return None
 
     def _collect_entities(self, results: List[qmodels.ScoredPoint]) -> List[str]:
         entity_ids: List[str] = []

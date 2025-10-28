@@ -46,8 +46,18 @@ class IngestionTimelineDetailsModel(BaseModel):
     events: int
 
 
+class IngestionForensicsArtifactModel(BaseModel):
+    document_id: str
+    type: str
+    schema_version: str
+    generated_at: datetime | None
+    report_path: str
+    fallback_applied: bool = False
+
+
 class IngestionForensicsDetailsModel(BaseModel):
-    artifacts: List[dict] = Field(default_factory=list)
+    artifacts: List[IngestionForensicsArtifactModel] = Field(default_factory=list)
+    last_run_at: datetime | None = None
 
 
 class IngestionGraphDetailsModel(BaseModel):
@@ -82,6 +92,7 @@ class CitationModel(BaseModel):
 class TraceModel(BaseModel):
     vector: List[dict]
     graph: dict
+    forensics: List[dict] = Field(default_factory=list)
 
 
 class QueryResponse(BaseModel):
@@ -120,6 +131,28 @@ class GraphNeighborResponse(BaseModel):
     edges: List[GraphEdgeModel]
 
 
+class ForensicsStageModel(BaseModel):
+    name: str
+    started_at: datetime
+    completed_at: datetime
+    status: str
+    notes: List[str]
+
+
+class ForensicsSignalModel(BaseModel):
+    type: str
+    level: Literal["info", "warning", "error"]
+    detail: str
+    data: Optional[dict] = None
+
+
 class ForensicsResponse(BaseModel):
+    summary: str
     data: dict
+    metadata: dict
+    signals: List[ForensicsSignalModel]
+    stages: List[ForensicsStageModel]
+    fallback_applied: bool
+    schema_version: str
+    generated_at: Optional[datetime] = None
 
