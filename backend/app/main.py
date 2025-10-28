@@ -117,10 +117,24 @@ def _load_forensics(
     artifact: str,
 ) -> ForensicsResponse:
     try:
-        data = service.load_artifact(file_id, artifact)
+        payload = service.load_artifact(file_id, artifact)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return ForensicsResponse(data=data)
+    if payload.get("fallback_applied") and not payload.get("data"):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Forensics analyzer unavailable for artifact {artifact}",
+        )
+    return ForensicsResponse(
+        summary=payload.get("summary", ""),
+        data=payload.get("data", {}),
+        metadata=payload.get("metadata", {}),
+        signals=payload.get("signals", []),
+        stages=payload.get("stages", []),
+        fallback_applied=payload.get("fallback_applied", False),
+        schema_version=payload.get("schema_version", "unknown"),
+        generated_at=payload.get("generated_at"),
+    )
 
 
 @app.get("/forensics/document", response_model=ForensicsResponse)
