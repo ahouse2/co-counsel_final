@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
 from ..config import get_settings
 from ..utils.audit import AuditEvent, get_audit_trail
