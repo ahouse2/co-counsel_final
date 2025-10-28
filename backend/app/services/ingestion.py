@@ -26,7 +26,7 @@ from ..utils.triples import (
     extract_triples,
     normalise_entity_id,
 )
-from .forensics import ForensicsService
+from .forensics import ForensicsReport, ForensicsService
 from .graph import GraphService, get_graph_service
 from .ingestion_sources import MaterializedSource, build_connector
 from .vector import VectorService, get_vector_service
@@ -125,7 +125,7 @@ class IngestionService:
                 )
                 connector = build_connector(source.type, self.settings, self.credential_registry, self.logger)
                 materialized = connector.materialize(job_id, index, source)
-                documents, events, skipped, mutation = self._ingest_materialized_source(materialized)
+                documents, events, skipped, mutation, reports = self._ingest_materialized_source(materialized)
                 all_documents.extend(documents)
                 all_events.extend(events)
                 graph_nodes.update(mutation.nodes)
@@ -137,8 +137,10 @@ class IngestionService:
                 job_record["status_details"]["ingestion"]["skipped"].extend(skipped)
                 job_record["status_details"]["timeline"]["events"] += len(events)
                 job_record["status_details"]["forensics"]["artifacts"].extend(
-                    {"document_id": doc.id, "type": doc.type} for doc in documents
+                    self._format_forensics_status(report) for report in reports
                 )
+                if reports:
+                    job_record["status_details"]["forensics"]["last_run_at"] = reports[-1].generated_at
                 job_record["status_details"]["graph"]["nodes"] = len(graph_nodes)
                 job_record["status_details"]["graph"]["edges"] = len(graph_edges)
                 job_record["status_details"]["graph"]["triples"] = triple_count
@@ -201,6 +203,7 @@ class IngestionService:
         List[TimelineEvent],
         List[Dict[str, str]],
         GraphMutation,
+        List[ForensicsReport],
     ]:
         root = materialized.root
         if not root.exists():
@@ -209,39 +212,45 @@ class IngestionService:
         events: List[TimelineEvent] = []
         skipped: List[Dict[str, str]] = []
         graph_mutation = GraphMutation()
+        reports: List[ForensicsReport] = []
         origin = materialized.origin or str(root)
         for path in sorted(root.rglob("*")):
             if not path.is_file():
                 continue
             suffix = path.suffix.lower()
             if suffix in _TEXT_EXTENSIONS:
-                document, timeline_events, mutation = self._ingest_text(path, origin)
+                document, timeline_events, mutation, report = self._ingest_text(path, origin)
                 documents.append(document)
                 events.extend(timeline_events)
                 graph_mutation.merge(mutation)
+                reports.append(report)
             elif suffix in _IMAGE_EXTENSIONS:
                 doc_meta = self._register_document(path, doc_type="image", origin=origin)
-                self.forensics_service.build_image_artifact(doc_meta.id, path)
+                report = self.forensics_service.build_image_artifact(doc_meta.id, path)
                 documents.append(doc_meta)
                 mutation = GraphMutation()
                 mutation.record_node(doc_meta.id)
                 graph_mutation.merge(mutation)
+                reports.append(report)
             elif suffix in _FINANCIAL_EXTENSIONS:
                 doc_meta = self._register_document(path, doc_type="financial", origin=origin)
-                self.forensics_service.build_financial_artifact(doc_meta.id, path)
+                report = self.forensics_service.build_financial_artifact(doc_meta.id, path)
                 documents.append(doc_meta)
                 mutation = GraphMutation()
                 mutation.record_node(doc_meta.id)
                 graph_mutation.merge(mutation)
+                reports.append(report)
             else:
                 skipped.append({"path": str(path), "reason": "unsupported_extension"})
                 self.logger.debug(
                     "Skipping unsupported file",
                     extra={"job_source": materialized.source.type, "path": str(path)},
                 )
-        return documents, events, skipped, graph_mutation
+        return documents, events, skipped, graph_mutation, reports
 
-    def _ingest_text(self, path: Path, origin: str) -> Tuple[IngestedDocument, List[TimelineEvent], GraphMutation]:
+    def _ingest_text(
+        self, path: Path, origin: str
+    ) -> Tuple[IngestedDocument, List[TimelineEvent], GraphMutation, ForensicsReport]:
         document = self._register_document(path, doc_type="text", origin=origin)
         mutation = GraphMutation()
         mutation.record_node(document.id)
@@ -277,8 +286,8 @@ class IngestionService:
             self._commit_triples(document.id, triples, mutation)
 
         timeline_events = self._build_timeline_events(document.id, text)
-        self.forensics_service.build_document_artifact(document.id, path)
-        return document, timeline_events, mutation
+        report = self.forensics_service.build_document_artifact(document.id, path)
+        return document, timeline_events, mutation, report
 
     def _commit_entity(self, doc_id: str, span: EntitySpan, mutation: GraphMutation) -> None:
         entity_id = normalise_entity_id(span.label)
@@ -386,6 +395,16 @@ class IngestionService:
 
     # region job manifest helpers
 
+    def _format_forensics_status(self, report: ForensicsReport) -> Dict[str, object]:
+        return {
+            "document_id": report.file_id,
+            "type": report.artifact_type,
+            "schema_version": report.schema_version,
+            "generated_at": report.generated_at,
+            "report_path": str(report.report_path) if report.report_path else str(self.forensics_service.base_dir / report.file_id / "report.json"),
+            "fallback_applied": report.fallback_applied,
+        }
+
     def _initialise_job_record(
         self, job_id: str, submitted_at: datetime, sources: List[IngestionSource]
     ) -> Dict[str, object]:
@@ -401,7 +420,7 @@ class IngestionService:
             "status_details": {
                 "ingestion": {"documents": 0, "skipped": []},
                 "timeline": {"events": 0},
-                "forensics": {"artifacts": []},
+                "forensics": {"artifacts": [], "last_run_at": None},
                 "graph": {"nodes": 0, "edges": 0, "triples": 0},
             },
         }

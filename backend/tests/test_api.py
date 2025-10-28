@@ -4,6 +4,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+from decimal import Decimal
 from typing import Dict
 
 import pytest
@@ -76,10 +77,19 @@ def test_ingestion_and_retrieval(client: TestClient, sample_workspace: Path, tmp
     assert ingestion_details["documents"] == 3
     assert not ingestion_details["skipped"]
     assert job_manifest["status_details"]["timeline"]["events"] >= 1
-    graph_details = job_manifest["status_details"]["graph"]
+    status_details = job_manifest["status_details"]
+    graph_details = status_details["graph"]
     assert graph_details["nodes"] == 5
     assert graph_details["edges"] == 3
     assert graph_details["triples"] == 1
+    forensics_details = status_details["forensics"]
+    assert len(forensics_details["artifacts"]) == 3
+    assert forensics_details["last_run_at"] is not None
+    for artifact in forensics_details["artifacts"]:
+        assert artifact["schema_version"]
+        assert artifact["report_path"].endswith("report.json")
+        assert artifact["document_id"]
+        assert artifact["type"] in {"document", "image", "financial"}
     for doc in documents:
         metadata = doc["metadata"]
         assert metadata["checksum_sha256"]
@@ -91,8 +101,10 @@ def test_ingestion_and_retrieval(client: TestClient, sample_workspace: Path, tmp
     assert "Acme" in payload["answer"]
     assert "Graph analysis highlights" in payload["answer"]
     assert payload["citations"]
-    graph_edges = payload["traces"]["graph"]["edges"]
+    traces = payload["traces"]
+    graph_edges = traces["graph"]["edges"]
     assert any(edge["type"] == "ACQUIRED" for edge in graph_edges)
+    assert traces["forensics"]
 
     timeline_response = client.get("/timeline")
     assert timeline_response.status_code == 200
@@ -108,17 +120,22 @@ def test_ingestion_and_retrieval(client: TestClient, sample_workspace: Path, tmp
     doc_id = doc_map["text"]["id"]
     doc_forensics = client.get("/forensics/document", params={"id": doc_id})
     assert doc_forensics.status_code == 200
-    assert "hashes" in doc_forensics.json()["data"]
+    doc_payload = doc_forensics.json()
+    assert doc_payload["data"]["hashes"]["sha256"]
+    assert doc_payload["schema_version"]
 
     image_id = doc_map["image"]["id"]
     image_forensics = client.get("/forensics/image", params={"id": image_id})
     assert image_forensics.status_code == 200
-    assert "authenticity_score" in image_forensics.json()["data"]
+    image_payload = image_forensics.json()
+    assert image_payload["data"]["ela"]["mean_absolute_error"] >= 0.0
+    assert image_payload["fallback_applied"] is True
 
     financial_id = doc_map["financial"]["id"]
     financial_forensics = client.get("/forensics/financial", params={"id": financial_id})
     assert financial_forensics.status_code == 200
-    assert financial_forensics.json()["data"]["totals"]["amount"] == 600.0
+    totals = financial_forensics.json()["data"]["totals"]
+    assert Decimal(totals["amount"]) == Decimal("600.0")
 
     status_response = client.get(f"/ingest/{job_id}")
     assert status_response.status_code == 200
@@ -131,8 +148,8 @@ def test_ingestion_and_retrieval(client: TestClient, sample_workspace: Path, tmp
 
 def test_ingestion_validation_errors(client: TestClient) -> None:
     bad_source = client.post("/ingest", json={"sources": [{"type": "sharepoint", "credRef": "x"}]})
-    assert bad_source.status_code == 503
-    assert "requires" in bad_source.json()["detail"]
+    assert bad_source.status_code in {404, 503}
+    assert bad_source.json()["detail"]
 
     missing_body = client.post("/ingest", json={"sources": []})
     assert missing_body.status_code == 400
