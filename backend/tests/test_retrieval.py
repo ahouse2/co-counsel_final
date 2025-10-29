@@ -167,3 +167,9 @@ def test_stream_result_generates_events(
     assert events[0].startswith("{\"type\": \"meta\"")
     assert any("\"type\": \"answer\"" in event for event in events)
     assert events[-1].startswith("{\"type\": \"final\"")
+    node_ids = {node["id"] for node in graph_payload["nodes"]}
+    assert {"doc-trace", "entity-graph"}.issubset(node_ids)
+    relation_types = {edge["type"] for edge in graph_payload["edges"]}
+    assert "ASSOCIATED_WITH" in relation_types
+    event_doc_ids = {citation for event in graph_payload["events"] for citation in event.get("citations", [])}
+    assert "doc-trace" in event_doc_ids
