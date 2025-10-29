@@ -325,6 +325,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, security_materials: 
     monkeypatch.setenv("KNOWLEDGE_CATALOG_PATH", str(repo_root / "docs/knowledge/catalog.json"))
     monkeypatch.setenv("KNOWLEDGE_CONTENT_DIR", str(repo_root / "docs/knowledge/best_practices"))
     monkeypatch.setenv("KNOWLEDGE_PROGRESS_PATH", str(storage_root / "knowledge" / "progress.json"))
+    monkeypatch.setenv("VOICE_SESSIONS_DIR", str(storage_root / "voice" / "sessions"))
+    monkeypatch.setenv("VOICE_CACHE_DIR", str(storage_root / "voice" / "cache"))
     monkeypatch.setenv("VECTOR_BACKEND", "memory")
     monkeypatch.setenv("INGESTION_COST_MODE", "community")
     monkeypatch.setenv("INGESTION_HF_MODEL", "local://tests")
