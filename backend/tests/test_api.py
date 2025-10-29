@@ -8,14 +8,17 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Dict
 
-import pytest
 from fastapi.testclient import TestClient
 
+from backend.app.utils.storage import decrypt_manifest
 
 def _read_job_manifest(job_dir: Path, job_id: str) -> Dict[str, object]:
     manifest = job_dir / f"{job_id}.json"
     assert manifest.exists(), f"Expected manifest {manifest}"
-    return json.loads(manifest.read_text())
+    envelope = manifest.read_text()
+    key_path = Path(os.environ["MANIFEST_ENCRYPTION_KEY_PATH"])
+    key = key_path.read_bytes()
+    return decrypt_manifest(json.loads(envelope), key, associated_data=job_id)
 
 
 def _wait_for_job_completion(job_dir: Path, job_id: str, timeout: float = 10.0) -> Dict[str, object]:
@@ -30,6 +33,25 @@ def _wait_for_job_completion(job_dir: Path, job_id: str, timeout: float = 10.0) 
         time.sleep(0.05)
 
 
+def _wait_for_job(
+    client: TestClient,
+    job_id: str,
+    *,
+    timeout: float = 5.0,
+    headers: Dict[str, str] | None = None,
+) -> Dict[str, object]:
+    deadline = time.time() + timeout
+    last_payload: Dict[str, object] | None = None
+    while time.time() < deadline:
+        request_headers = headers or dict(client.headers)
+        response = client.get(f"/ingest/{job_id}", headers=request_headers)
+        assert response.status_code in {200, 202}
+        last_payload = response.json()
+        status_value = last_payload.get("status")
+        if status_value in {"succeeded", "failed", "cancelled"}:
+            return last_payload
+        time.sleep(0.1)
+    pytest.fail(f"Ingestion job {job_id} did not reach terminal state; last payload={last_payload}")
 def test_ingestion_and_retrieval(
     client: TestClient,
     sample_workspace: Path,
@@ -37,6 +59,11 @@ def test_ingestion_and_retrieval(
     auth_headers_factory,
 ) -> None:
     headers = auth_headers_factory()
+    status_headers = auth_headers_factory(
+        scopes=["ingest:status"],
+        roles=["CaseCoordinator", "PlatformEngineer"],
+        audience=["co-counsel.ingest"],
+    )
     response = client.post(
         "/ingest",
         json={"sources": [{"type": "local", "path": str(sample_workspace)}]},
@@ -44,6 +71,9 @@ def test_ingestion_and_retrieval(
     )
     assert response.status_code == 202
     job_id = response.json()["job_id"]
+
+    status_payload = _wait_for_job(client, job_id, headers=headers)
+    assert status_payload["status"] == "succeeded"
 
     job_manifest = _wait_for_job_completion(Path(os.environ["JOB_STORE_DIR"]), job_id)
     documents = job_manifest["documents"]
@@ -89,6 +119,9 @@ def test_ingestion_and_retrieval(
     assert any(edge["type"] == "ACQUIRED" for edge in graph_edges)
     assert traces["forensics"]
     assert len(traces["vector"]) <= meta["page_size"]
+    privilege = traces["privilege"]
+    assert privilege["aggregate"]["label"] in {"non_privileged", "privileged", "unknown"}
+    assert isinstance(privilege["decisions"], list)
 
     timeline_response = client.get("/timeline", headers=headers)
     assert timeline_response.status_code == 200
@@ -129,11 +162,11 @@ def test_ingestion_and_retrieval(
     totals = financial_forensics.json()["data"]["totals"]
     assert Decimal(totals["amount"]) == Decimal("600.0")
 
+    status_payload = _wait_for_job(client, job_id, headers=headers)
     status_response = client.get(f"/ingest/{job_id}", headers=headers)
     assert status_response.status_code == 200
     status_payload = status_response.json()
     assert status_payload["job_id"] == job_id
-    assert status_payload["status"] == "succeeded"
     assert status_payload["status_details"]["ingestion"]["documents"] == 3
     assert status_payload["documents"][0]["metadata"]["checksum_sha256"]
 
@@ -268,6 +301,9 @@ def test_timeline_pagination_and_filters(
         "/timeline", params={"entity": "Acme Corporation"}, headers=headers
     ).json()
     assert all(event["id"] != neutral_event.id for event in entity_payload["events"])
+    assert "entity_highlights" in entity_payload["events"][0]
+    assert "relation_tags" in entity_payload["events"][0]
+    assert "confidence" in entity_payload["events"][0]
 
     ts_threshold = page_two_payload["events"][0]["ts"]
     range_payload = client.get(
@@ -277,6 +313,10 @@ def test_timeline_pagination_and_filters(
 
     invalid_cursor = client.get("/timeline", params={"cursor": "@@bad"}, headers=headers)
     assert invalid_cursor.status_code == 400
+    invalid_payload = invalid_cursor.json()["detail"]
+    assert invalid_payload["code"] == "TIMELINE_CURSOR_INVALID"
+    assert invalid_payload["component"] == "timeline"
+    assert invalid_payload["retryable"] is False
 
     aware_filter = client.get(
         "/timeline",
@@ -284,7 +324,9 @@ def test_timeline_pagination_and_filters(
         headers=headers,
     )
     assert aware_filter.status_code == 400
-    assert "timezone-naive" in aware_filter.json()["detail"]
+    aware_payload = aware_filter.json()["detail"]
+    assert aware_payload["code"] == "TIMELINE_TIMEZONE_AWARE"
+    assert "timezone-naive" in aware_payload["message"]
 
 
 def test_ingestion_validation_errors(client: TestClient, auth_headers_factory) -> None:
