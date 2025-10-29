@@ -13,6 +13,8 @@
 ## Property Graph Backends
 - Neo4j: accessed via transactional Cypher, mirrored into LlamaIndex `PropertyGraphStore` for KG tooling.
 - In-memory: NetworkX-driven DiGraph with LlamaIndex SimplePropertyGraph fallback to remain operable offline.
+- `GraphService.get_knowledge_index()` lazily initialises a LlamaIndex `KnowledgeGraphIndex` bound to the active store; node/edge
+  registrations call `_sync_knowledge_index` so tooling such as text-to-Cypher and KG agents stay fresh without manual rebuilds.
 - Graph service exposes `run_cypher`, `describe_schema`, and text-to-Cypher prompt scaffolding for agent workflows.
 - Unified subgraph export via `GraphService.subgraph` standardises node/edge payloads for retrieval traces and UI panes.
 
