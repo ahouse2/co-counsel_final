@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List
-from urllib.parse import quote, urlparse
+from urllib.parse import urlparse
 from typing import Any, Callable, Coroutine, Dict, List, Tuple
 from urllib.parse import urljoin
 
@@ -170,6 +170,10 @@ class S3SourceConnector(BaseSourceConnector):
     def _ensure_boto3(self):
         try:
             import boto3  # type: ignore
+        except ImportError as exc:  # pragma: no cover - dependency guard
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="boto3 is required for S3 sources",
         except ImportError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -624,6 +628,7 @@ class SharePointSourceConnector(BaseSourceConnector):
 
 
 class OneDriveSourceConnector(BaseSourceConnector):
+    GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
     _TOKEN_SCOPE = "https://graph.microsoft.com/.default"
     _GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
     _MAX_RETRIES = 3
@@ -654,6 +659,7 @@ class OneDriveSourceConnector(BaseSourceConnector):
             )
 
     def materialize(self, job_id: str, index: int, source: IngestionSource) -> MaterializedSource:
+        httpx_module = self._ensure_dependencies()
         httpx = self._ensure_dependencies()
 
         if not source.credRef:
@@ -676,6 +682,12 @@ class OneDriveSourceConnector(BaseSourceConnector):
         headers = {"Authorization": f"Bearer {token}"}
         workspace = self._workspace(job_id, index)
 
+        token = self._acquire_token(httpx_module, tenant_id, client_id, client_secret)
+        headers = {"Authorization": f"Bearer {token}"}
+        folder_path = folder.strip("/")
+
+        with httpx_module.Client(timeout=self._client_timeout) as client:
+            base_item = self._resolve_base_item(client, drive_id, folder_path, headers)
         with httpx.Client(timeout=self._client_timeout) as client:
             base_item = self._resolve_base_item(client, drive_id, base_folder, headers)
             files_downloaded = self._download_tree(client, drive_id, base_item, workspace, headers)
@@ -683,6 +695,13 @@ class OneDriveSourceConnector(BaseSourceConnector):
         if not files_downloaded:
             self.logger.warning(
                 "OneDrive source produced no files",
+                extra={"drive_id": drive_id, "folder": folder_path or "<root>", "credRef": source.credRef},
+            )
+
+        origin_suffix = folder_path if folder_path else "root"
+        return MaterializedSource(root=workspace, source=source, origin=f"onedrive:{drive_id}/{origin_suffix}")
+
+    def _ensure_dependencies(self):
                 extra={"drive_id": drive_id, "folder": base_folder or "<root>", "credRef": source.credRef},
             )
 
@@ -901,14 +920,64 @@ class WebSourceConnector(BaseSourceConnector):
 
     def _load_credentials(self, reference: str) -> Dict[str, str]:
         try:
-            credentials = self.registry.get(reference)
-        except KeyError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Credential {reference} not found") from exc
-        return {key: str(value) for key, value in credentials.items()}
+            import httpx as httpx_module  # type: ignore
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OneDrive ingestion requires httpx; install optional dependency",
+            ) from exc
+        return httpx_module
+
+    def _acquire_token(
+        self,
+        httpx_module,
+        tenant_id: str,
+        client_id: str,
+        client_secret: str,
+    ) -> str:
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        data = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": " ".join(self.GRAPH_SCOPE),
+            "grant_type": "client_credentials",
+        }
+        try:
+            with httpx_module.Client(timeout=self._client_timeout) as client:
+                response = client.post(token_url, data=data)
+        except Exception as exc:  # pylint: disable=broad-except
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OneDrive token request failed: network error",
+            ) from exc
+
+        if response.status_code >= 400:
+            message = getattr(response, "text", "") or f"HTTP {response.status_code}"
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"OneDrive token request failed: {message}",
+            )
+
+        try:
+            payload = response.json()
+        except Exception as exc:  # pylint: disable=broad-except
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="OneDrive token request failed: invalid response",
+            ) from exc
+
+        token = payload.get("access_token")
+        if not token:
+            description = payload.get("error_description") or payload.get("error") or "unknown error"
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"OneDrive token request failed: {description}",
+            )
+        return token
 
     def _resolve_base_item(
         self,
-        client: httpx.Client,
+        client,
         drive_id: str,
         folder_path: str,
         headers: Dict[str, str],
@@ -930,13 +999,13 @@ class WebSourceConnector(BaseSourceConnector):
 
     def _download_tree(
         self,
-        client: httpx.Client,
+        client,
         drive_id: str,
         base_item: Dict[str, str],
         workspace: Path,
         headers: Dict[str, str],
     ) -> bool:
-        queue: list[Tuple[str, Path]] = [(base_item["id"], Path(""))]
+        queue: List[tuple[str, Path]] = [(base_item["id"], Path())]
         files_downloaded = False
 
         while queue:
@@ -964,11 +1033,7 @@ class WebSourceConnector(BaseSourceConnector):
                     files_downloaded = True
                     self.logger.info(
                         "Downloaded OneDrive file",
-                        extra={
-                            "drive_id": drive_id,
-                            "item_id": child_id,
-                            "path": str(destination),
-                        },
+                        extra={"drive_id": drive_id, "item_id": child_id, "path": str(destination)},
                     )
                 next_url = payload.get("@odata.nextLink")
         return files_downloaded
@@ -979,8 +1044,8 @@ class WebSourceConnector(BaseSourceConnector):
         url: str,
         *,
         headers: Dict[str, str] | None = None,
-    ) -> httpx.Response:
-        last_response: httpx.Response | None = None
+    ):
+        last_response = None
         for attempt in range(self._MAX_RETRIES):
             response = method(url, headers=headers, follow_redirects=True)
             status_code = response.status_code
@@ -1002,6 +1067,67 @@ class WebSourceConnector(BaseSourceConnector):
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"OneDrive request to {url} failed: {detail}",
         )
+
+
+class WebSourceConnector(BaseSourceConnector):
+    def preflight(self, source: IngestionSource) -> None:
+        self._validate_url(source)
+        self._ensure_httpx()
+
+    def materialize(self, job_id: str, index: int, source: IngestionSource) -> MaterializedSource:
+        httpx = self._ensure_httpx()
+        url = self._validate_url(source)
+
+        workspace = self._workspace(job_id, index, "web")
+        filename = self._build_filename(url)
+        target = workspace / filename
+
+        with httpx.Client(timeout=30.0) as client:
+            try:
+                response = client.get(url)
+            except httpx.RequestError as exc:  # type: ignore[attr-defined]
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Failed to fetch {url}: {exc}",
+                ) from exc
+            if response.status_code >= 400:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Failed to fetch {url}: HTTP {response.status_code}",
+                )
+            target.write_bytes(response.content)
+
+        self.logger.info("Fetched web source", extra={"url": url, "path": str(target)})
+        origin = f"web:{_normalise_url_path(url)}"
+        return MaterializedSource(root=workspace, source=source, origin=origin)
+
+    def _ensure_httpx(self):
+        try:
+            import httpx
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Web ingestion requires httpx optional dependency",
+            ) from exc
+        return httpx
+
+    def _validate_url(self, source: IngestionSource) -> str:
+        if not source.path:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Web source requires a URL in path")
+        url = source.path.strip()
+        if not url.lower().startswith(("http://", "https://")):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Web source path must be a HTTP(S) URL",
+            )
+        return url
+
+    def _build_filename(self, url: str) -> str:
+        parsed = urlparse(url)
+        name = Path(parsed.path).name or "index.html"
+        if "." not in name:
+            name = f"{name}.html"
+        return name
 
 
 def build_connector(source_type: str, settings: Settings, registry: CredentialRegistry, logger: logging.Logger) -> BaseSourceConnector:
