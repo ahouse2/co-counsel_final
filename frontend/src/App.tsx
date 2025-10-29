@@ -41,6 +41,19 @@ function App(): JSX.Element {
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName;
+        if (
+          target.isContentEditable ||
+          tagName === 'INPUT' ||
+          tagName === 'TEXTAREA' ||
+          tagName === 'SELECT' ||
+          target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+        ) {
+          return;
+        }
+      }
       if (event.altKey || event.metaKey || event.ctrlKey) return;
       if (event.key.toLowerCase() === 'g') {
         event.preventDefault();
