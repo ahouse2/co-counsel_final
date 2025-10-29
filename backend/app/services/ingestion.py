@@ -3,12 +3,13 @@ from __future__ import annotations
 import atexit
 import logging
 import mimetypes
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 from uuid import uuid4
 
 from fastapi import HTTPException, status
@@ -16,9 +17,11 @@ from qdrant_client.http import models as qmodels
 
 from ..config import get_settings
 from ..models.api import IngestionRequest, IngestionSource
+from ..security.authz import Principal
 from ..storage.document_store import DocumentStore
 from ..storage.job_store import JobStore
 from ..storage.timeline_store import TimelineEvent, TimelineStore
+from ..utils.audit import AuditEvent, get_audit_trail
 from ..utils.credentials import CredentialRegistry
 from ..utils.text import (
     chunk_text,
@@ -45,7 +48,7 @@ from .ingestion_worker import (
 )
 from .vector import VectorService, get_vector_service
 
-_TEXT_EXTENSIONS = {".txt", ".md", ".json", ".log", ".rtf"}
+_TEXT_EXTENSIONS = {".txt", ".md", ".json", ".log", ".rtf", ".html", ".htm"}
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
 _FINANCIAL_EXTENSIONS = {".csv"}
 
@@ -90,6 +93,9 @@ class GraphMutation:
         self.triples += other.triples
 
 
+_DEFAULT_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+
+
 class IngestionService:
     def __init__(
         self,
@@ -99,6 +105,7 @@ class IngestionService:
         job_store: JobStore | None = None,
         document_store: DocumentStore | None = None,
         forensics_service: ForensicsService | None = None,
+        executor: ThreadPoolExecutor | None = None,
         worker: IngestionWorker | None = None,
     ) -> None:
         self.logger = LOGGER
@@ -110,19 +117,114 @@ class IngestionService:
         self.document_store = document_store or DocumentStore(self.settings.document_store_dir)
         self.forensics_service = forensics_service or ForensicsService()
         self.credential_registry = CredentialRegistry(self.settings.credentials_registry_path)
+        self.executor = executor or _DEFAULT_EXECUTOR
         self.worker = worker
+        self.audit = get_audit_trail()
 
-    def ingest(self, request: IngestionRequest) -> str:
+    def ingest(self, request: IngestionRequest, principal: Principal | None = None) -> str:
         if not request.sources:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one source must be provided",
             )
 
+        connectors = [
+            (
+                build_connector(source.type, self.settings, self.credential_registry, self.logger),
+                source,
+            )
+            for source in request.sources
+        ]
+
         job_id = str(uuid4())
         submitted_at = datetime.now(timezone.utc)
-        job_record = self._initialise_job_record(job_id, submitted_at, request.sources)
+        actor = self._actor_from_principal(principal)
+        job_record = self._initialise_job_record(job_id, submitted_at, request.sources, actor)
         self.job_store.write_job(job_id, job_record)
+
+        for index, source in enumerate(request.sources):
+            connector = build_connector(source.type, self.settings, self.credential_registry, self.logger)
+        for connector, source in connectors:
+            try:
+                connector.preflight(source)
+            except HTTPException as exc:
+                message = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+                error_payload = {
+                    "code": str(getattr(exc, "status_code", "INGESTION_ERROR")),
+                    "message": message,
+                    "source": f"preflight::{source.type.lower()}",
+                }
+                self._record_error(job_record, error_payload)
+                job_record.setdefault("status_details", {}).setdefault("ingestion", {}).setdefault("skipped", []).append(
+                    {"index": index, "source": source.type, "reason": message}
+                )
+                self._transition_job(job_record, "failed")
+                self.job_store.write_job(job_id, job_record)
+                self._audit_job_event(
+                    job_id,
+                    action="ingest.queue.preflight_failed",
+                    outcome="error",
+                    metadata={"source_type": source.type, "index": index},
+                    actor=actor,
+                    severity="error",
+                self._record_error(
+                    job_record,
+                    {
+                        "code": str(exc.status_code),
+                        "message": message,
+                        "source": source.type,
+                    },
+                )
+                self._transition_job(job_record, "failed")
+                self._touch_job(job_record)
+                self.job_store.write_job(job_id, job_record)
+                severity = "error" if exc.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR else "warning"
+                self._audit_job_event(
+                    job_id,
+                    action="ingest.job.preflight_failed",
+                    outcome="error",
+                    metadata={"source_type": source.type, "status_code": exc.status_code},
+                    actor=actor,
+                    severity=severity,
+                )
+                return job_id
+
+        request_copy = request.model_copy(deep=True)
+        future = self.executor.submit(self._run_job, job_id, request_copy, job_record)
+        future.add_done_callback(self._log_job_failure(job_id))
+        return job_id
+
+    def get_job(self, job_id: str) -> Dict[str, object]:
+        record = self.job_store.read_job(job_id)
+        record.setdefault("job_id", job_id)
+        return record
+
+    # region async execution
+
+    def _log_job_failure(self, job_id: str):
+        def _callback(future: Future) -> None:
+            try:
+                future.result()
+            except HTTPException:
+                # Already logged inside the worker
+                return
+            except Exception:  # pylint: disable=broad-except
+                self.logger.exception("Unhandled ingestion worker failure", extra={"job_id": job_id})
+
+        return _callback
+
+    def _run_job(self, job_id: str, request: IngestionRequest, job_record: Dict[str, object]) -> None:
+        actor = self._job_actor(job_record)
+        self._audit_job_event(
+            job_id,
+            action="ingest.job.accepted",
+            outcome="accepted",
+            metadata={
+                "source_count": len(request.sources),
+                "sources": sorted({source.type for source in request.sources}),
+            },
+            actor=actor,
+        )
 
         worker = self.worker or get_ingestion_worker()
         payload = request.model_dump(mode="json")
@@ -130,6 +232,14 @@ class IngestionService:
             worker.enqueue(job_id, payload)
         except IngestionJobAlreadyQueued:
             self.logger.info("Job already queued", extra={"job_id": job_id})
+            self._audit_job_event(
+                job_id,
+                action="ingest.queue.duplicate",
+                outcome="ignored",
+                metadata={"reason": "already_queued"},
+                actor=actor,
+                severity="warning",
+            )
         except IngestionQueueFull as exc:
             self._record_error(
                 job_record,
@@ -141,6 +251,14 @@ class IngestionService:
             )
             self._transition_job(job_record, "failed")
             self.job_store.write_job(job_id, job_record)
+            self._audit_job_event(
+                job_id,
+                action="ingest.queue.saturated",
+                outcome="rejected",
+                metadata={"queue_max": self.settings.ingestion_queue_maxsize},
+                actor=actor,
+                severity="warning",
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Ingestion queue is full",
@@ -148,6 +266,13 @@ class IngestionService:
         else:
             self._touch_job(job_record)
             self.job_store.write_job(job_id, job_record)
+            self._audit_job_event(
+                job_id,
+                action="ingest.queue.enqueued",
+                outcome="success",
+                metadata={"worker_concurrency": self.settings.ingestion_worker_concurrency},
+                actor=actor,
+            )
         return job_id
 
     def process_job(self, job_id: str, request: IngestionRequest) -> None:
@@ -155,15 +280,34 @@ class IngestionService:
             job_record = self.job_store.read_job(job_id)
         except FileNotFoundError:
             submitted_at = datetime.now(timezone.utc)
-            job_record = self._initialise_job_record(job_id, submitted_at, request.sources)
+            job_record = self._initialise_job_record(
+                job_id,
+                submitted_at,
+                request.sources,
+                actor=self._system_actor(),
+            )
         else:
             self._ensure_job_defaults(job_record, request.sources)
 
         status_value = job_record.get("status", "queued")
+        self._audit_job_event(
+            job_id,
+            action="ingest.worker.claimed",
+            outcome="success",
+            metadata={"status": status_value},
+            actor=self._job_actor(job_record),
+        )
         if status_value in {"succeeded", "failed", "cancelled"}:
             self.logger.info(
                 "Skipping ingestion job with terminal status",
                 extra={"job_id": job_id, "status": status_value},
+            )
+            self._audit_job_event(
+                job_id,
+                action="ingest.worker.skipped",
+                outcome="ignored",
+                metadata={"status": status_value},
+                actor=self._job_actor(job_record),
             )
             return
 
@@ -215,6 +359,22 @@ class IngestionService:
                 job_record["status_details"]["graph"]["triples"] = triple_count
                 self._touch_job(job_record)
                 self.job_store.write_job(job_id, job_record)
+                self._audit_job_event(
+                    job_id,
+                    action="ingest.source.processed",
+                    outcome="success",
+                    metadata={
+                        "source_type": source.type,
+                        "index": index,
+                        "documents": len(documents),
+                        "timeline_events": len(events),
+                        "skipped": len(skipped),
+                        "graph_nodes": len(graph_nodes),
+                        "graph_edges": len(graph_edges),
+                        "triples": triple_count,
+                    },
+                    actor=self._job_actor(job_record),
+                )
         except HTTPException as exc:
             self._record_error(
                 job_record,
@@ -230,6 +390,14 @@ class IngestionService:
                 "Ingestion failed with HTTP error",
                 extra={"job_id": job_id, "status_code": exc.status_code},
             )
+            self._audit_job_event(
+                job_id,
+                action="ingest.job.failed",
+                outcome="error",
+                metadata={"status_code": exc.status_code, "detail": exc.detail},
+                actor=self._job_actor(job_record),
+                severity="error",
+            )
             raise
         except Exception as exc:  # pylint: disable=broad-except
             self._record_error(
@@ -243,6 +411,14 @@ class IngestionService:
             self._transition_job(job_record, "failed")
             self.job_store.write_job(job_id, job_record)
             self.logger.exception("Unexpected ingestion failure", extra={"job_id": job_id})
+            self._audit_job_event(
+                job_id,
+                action="ingest.job.failed",
+                outcome="error",
+                metadata={"error": str(exc)},
+                actor=self._job_actor(job_record),
+                severity="error",
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Ingestion failed unexpectedly",
@@ -255,6 +431,20 @@ class IngestionService:
         self.logger.info(
             "Ingestion completed",
             extra={"job_id": job_id, "documents": len(all_documents), "events": len(all_events)},
+        )
+
+        self._audit_job_event(
+            job_id,
+            action="ingest.job.completed",
+            outcome="success",
+            metadata={
+                "documents": len(all_documents),
+                "timeline_events": len(all_events),
+                "graph_nodes": len(graph_nodes),
+                "graph_edges": len(graph_edges),
+                "triples": triple_count,
+            },
+            actor=self._job_actor(job_record),
         )
 
     def _ensure_job_defaults(
@@ -283,11 +473,73 @@ class IngestionService:
         graph.setdefault("nodes", 0)
         graph.setdefault("edges", 0)
         graph.setdefault("triples", 0)
+        job_record.setdefault("requested_by", self._system_actor())
 
-    def get_job(self, job_id: str) -> Dict[str, object]:
-        record = self.job_store.read_job(job_id)
-        record.setdefault("job_id", job_id)
-        return record
+    def _system_actor(self) -> Dict[str, Any]:
+        return {"id": "ingestion-worker", "type": "system", "roles": ["System"]}
+
+    def _actor_from_principal(self, principal: Principal | None) -> Dict[str, Any]:
+        if principal is None:
+            return self._system_actor()
+        actor = {
+            "id": principal.client_id,
+            "subject": principal.subject,
+            "tenant_id": principal.tenant_id,
+            "roles": sorted(principal.roles),
+            "scopes": sorted(principal.scopes),
+            "case_admin": principal.case_admin,
+            "token_roles": sorted(principal.token_roles),
+            "certificate_roles": sorted(principal.certificate_roles),
+        }
+        fingerprint = principal.attributes.get("fingerprint") or principal.attributes.get("certificate_fingerprint")
+        if fingerprint:
+            actor["fingerprint"] = fingerprint
+        if principal.attributes:
+            lineage_hint = principal.attributes.get("lineage")
+            if lineage_hint:
+                actor["lineage"] = lineage_hint
+        return actor
+
+    def _job_actor(self, job_record: Dict[str, object]) -> Dict[str, Any]:
+        stored = job_record.get("requested_by")
+        if isinstance(stored, dict):
+            return stored
+        return self._system_actor()
+
+    def _audit_job_event(
+        self,
+        job_id: str,
+        *,
+        action: str,
+        outcome: str,
+        metadata: Dict[str, Any] | None = None,
+        actor: Dict[str, Any] | None = None,
+        severity: str = "info",
+    ) -> None:
+        if not job_id:
+            return
+        event = AuditEvent(
+            category="ingestion",
+            action=action,
+            actor=actor or self._system_actor(),
+            subject={"job_id": job_id},
+            outcome=outcome,
+            severity=severity,
+            correlation_id=job_id,
+            metadata=metadata or {},
+        )
+        self._safe_audit(event)
+
+    def _safe_audit(self, event: AuditEvent) -> None:
+        try:
+            self.audit.append(event)
+        except Exception:  # pragma: no cover - audit failures must never break ingestion
+            self.logger.exception(
+                "Failed to append audit event",
+                extra={"category": event.category, "action": event.action},
+            )
+
+    # endregion
 
     # region ingestion helpers
 
@@ -566,7 +818,11 @@ class IngestionService:
         }
 
     def _initialise_job_record(
-        self, job_id: str, submitted_at: datetime, sources: List[IngestionSource]
+        self,
+        job_id: str,
+        submitted_at: datetime,
+        sources: List[IngestionSource],
+        actor: Dict[str, Any] | None = None,
     ) -> Dict[str, object]:
         iso = submitted_at.isoformat()
         return {
@@ -583,11 +839,31 @@ class IngestionService:
                 "forensics": {"artifacts": [], "last_run_at": None},
                 "graph": {"nodes": 0, "edges": 0, "triples": 0},
             },
+            "requested_by": actor or self._system_actor(),
         }
 
     def _transition_job(self, job_record: Dict[str, object], status_value: str) -> None:
+        previous = job_record.get("status")
         job_record["status"] = status_value
         self._touch_job(job_record)
+        if previous == status_value:
+            return
+        severity = "info"
+        outcome = "success"
+        if status_value == "failed":
+            severity = "error"
+            outcome = "error"
+        elif status_value == "cancelled":
+            severity = "warning"
+            outcome = "warning"
+        self._audit_job_event(
+            str(job_record.get("job_id", "")),
+            action="ingest.status.transition",
+            outcome=outcome,
+            metadata={"from": previous, "to": status_value},
+            actor=self._job_actor(job_record),
+            severity=severity,
+        )
 
     def _touch_job(self, job_record: Dict[str, object]) -> None:
         job_record["updated_at"] = self._now_iso()
