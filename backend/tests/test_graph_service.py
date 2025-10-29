@@ -126,6 +126,32 @@ def test_build_text_to_cypher_prompt(memory_graph: graph_module.GraphService) ->
     assert "Node types" in prompt
 
 
+def test_property_graph_store_receives_nodes(memory_graph: graph_module.GraphService) -> None:
+    store = memory_graph.get_property_graph_store()
+    memory_graph.upsert_document("doc-store", "Store Doc", {})
+    memory_graph.upsert_entity("entity-store", "Entity", {"label": "Stored"})
+    memory_graph.merge_relation(
+        "doc-store",
+        "MENTIONS",
+        "entity-store",
+        {"doc_id": "doc-store"},
+    )
+    if hasattr(store, "graph"):
+        assert "doc-store" in store.graph["nodes"]
+        assert any("entity-store" in key for key in store.graph["relations"].keys())
+
+
+def test_get_knowledge_index_handles_missing_dependency(
+    memory_graph: graph_module.GraphService,
+) -> None:
+    if graph_module.KnowledgeGraphIndex is None or graph_module.StorageContext is None:
+        with pytest.raises(RuntimeError):
+            memory_graph.get_knowledge_index()
+    else:  # pragma: no cover - executed only when llama-index is installed locally
+        index = memory_graph.get_knowledge_index()
+        assert index is not None
+
+
 class _DummyNode(dict):
     def __init__(self, node_id: str, labels: list[str], props: dict[str, object]):
         super().__init__(props)
