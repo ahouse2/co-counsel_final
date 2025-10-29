@@ -142,11 +142,31 @@ class IngestionService:
         job_record = self._initialise_job_record(job_id, submitted_at, request.sources, actor)
         self.job_store.write_job(job_id, job_record)
 
+        for index, source in enumerate(request.sources):
+            connector = build_connector(source.type, self.settings, self.credential_registry, self.logger)
         for connector, source in connectors:
             try:
                 connector.preflight(source)
             except HTTPException as exc:
                 message = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+                error_payload = {
+                    "code": str(getattr(exc, "status_code", "INGESTION_ERROR")),
+                    "message": message,
+                    "source": f"preflight::{source.type.lower()}",
+                }
+                self._record_error(job_record, error_payload)
+                job_record.setdefault("status_details", {}).setdefault("ingestion", {}).setdefault("skipped", []).append(
+                    {"index": index, "source": source.type, "reason": message}
+                )
+                self._transition_job(job_record, "failed")
+                self.job_store.write_job(job_id, job_record)
+                self._audit_job_event(
+                    job_id,
+                    action="ingest.queue.preflight_failed",
+                    outcome="error",
+                    metadata={"source_type": source.type, "index": index},
+                    actor=actor,
+                    severity="error",
                 self._record_error(
                     job_record,
                     {
