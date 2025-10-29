@@ -705,6 +705,7 @@ sequenceDiagram
 
 ### 2025-11-21 · GraphRAG Operational Alignment
 - Integrate LlamaIndex `KnowledgeGraphIndex` abstractions with Neo4j + NetworkX backends via `GraphService` property graph adapters.
+- Expose `GraphService.get_knowledge_index()` for agent runtimes so LlamaIndex-based tools can operate on the synchronised property graph without bespoke wiring.
 - Post-ingestion pipeline executes community detection (greedy modularity with fallback) and persists summaries for retrieval + agent tooling.
 - Timeline enrichment now triggered immediately after ingestion with graph-aware highlights, tracked in job manifests.
 - Agents toolkit exposes `run_cypher`, schema description, and text-to-Cypher prompt builders for ad-hoc exploration.

@@ -27,6 +27,12 @@ try:  # Optional LlamaIndex property-graph integration
     )
     from llama_index.core.storage.storage_context import StorageContext  # type: ignore
     from llama_index.core.indices.knowledge_graph import KnowledgeGraphIndex  # type: ignore
+    try:
+        from llama_index.graph_stores.neo4j import (  # type: ignore[attr-defined]
+            Neo4jPropertyGraphStore as _LlamaNeo4jPropertyGraphStore,
+        )
+    except Exception:  # pragma: no cover - optional dependency may not exist
+        _LlamaNeo4jPropertyGraphStore = None  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     _LlamaSimplePropertyGraphStore = None
     _LlamaChunkNode = None
@@ -36,6 +42,7 @@ except ImportError:  # pragma: no cover - optional dependency
     _LlamaRelation = None
     StorageContext = None  # type: ignore
     KnowledgeGraphIndex = None  # type: ignore
+    _LlamaNeo4jPropertyGraphStore = None  # type: ignore
 
 
 @dataclass
@@ -197,13 +204,6 @@ _EntityNodeFactory = (
     _LlamaEntityNode if _LlamaEntityNode is not None else _FallbackLabelledNode
 )
 _RelationFactory = _LlamaRelation if _LlamaRelation is not None else _FallbackRelation
-_PropertyGraphStoreFactory = (
-    _LlamaSimplePropertyGraphStore
-    if _LlamaSimplePropertyGraphStore is not None
-    else _FallbackSimplePropertyGraphStore
-)
-
-
 @dataclass
 class GraphNode:
     id: str
@@ -295,7 +295,7 @@ class GraphService:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.mode = "neo4j" if self.settings.neo4j_uri != "memory://" else "memory"
-        self._property_graph = _PropertyGraphStoreFactory()
+        self._property_graph = self._create_property_graph_store()
         template_attr = getattr(self._property_graph, "text_to_cypher_template", None)
         self._text_to_cypher_template = (
             template_attr.template  # type: ignore[attr-defined]
@@ -318,6 +318,11 @@ class GraphService:
             self._nodes: Dict[str, GraphNode] = {}
             self._edges: Dict[Tuple[str, str, str, str | None], GraphEdge] = {}
             self._seed_ontology()
+        if KnowledgeGraphIndex is not None and StorageContext is not None:
+            try:
+                self.ensure_knowledge_index()
+            except RuntimeError:  # pragma: no cover - dependencies missing at runtime
+                pass
 
     # region Schema management
     def _ensure_constraints(self) -> None:
@@ -644,6 +649,9 @@ class GraphService:
                 pass
         return self._knowledge_index
 
+    def get_knowledge_index(self) -> Any:
+        return self.ensure_knowledge_index()
+
     def compute_community_summary(
         self, focus_nodes: Iterable[str] | None = None
     ) -> GraphCommunitySummary:
@@ -882,7 +890,9 @@ class GraphService:
         self._node_cache[node_id] = node
         if self._property_graph is not None:
             try:
-                self._property_graph.upsert_nodes([self._create_property_node(node)])
+                property_node = self._create_property_node(node)
+                self._property_graph.upsert_nodes([property_node])
+                self._sync_knowledge_index([property_node])
             except Exception:  # pragma: no cover - defensive fallback
                 pass
         if self._nx_graph is not None:
@@ -902,6 +912,7 @@ class GraphService:
                     nodes_to_upsert.append(self._create_property_node(target_node))
                 if nodes_to_upsert:
                     self._property_graph.upsert_nodes(nodes_to_upsert)
+                    self._sync_knowledge_index(nodes_to_upsert)
                 self._property_graph.upsert_relations([self._create_property_relation(edge)])
             except Exception:  # pragma: no cover - defensive fallback
                 pass
@@ -911,6 +922,23 @@ class GraphService:
                 edge.target,
                 **{"type": edge.type, "properties": dict(edge.properties)},
             )
+
+    def _create_property_graph_store(self) -> Any:
+        if self.mode == "neo4j" and _LlamaNeo4jPropertyGraphStore is not None:
+            try:
+                return _LlamaNeo4jPropertyGraphStore(
+                    url=self.settings.neo4j_uri,
+                    username=self.settings.neo4j_user,
+                    password=self.settings.neo4j_password,
+                )
+            except Exception:  # pragma: no cover - fallback to in-memory store
+                pass
+        if _LlamaSimplePropertyGraphStore is not None:
+            try:
+                return _LlamaSimplePropertyGraphStore()
+            except Exception:  # pragma: no cover - fallback to stub
+                pass
+        return _FallbackSimplePropertyGraphStore()
 
     def _create_property_node(self, node: GraphNode) -> Any:
         label = node.properties.get("type") or node.type or "Entity"
@@ -933,6 +961,22 @@ class GraphService:
             "type": edge.type,
             "properties": dict(edge.properties),
         }
+
+    def _sync_knowledge_index(self, nodes: Sequence[Any]) -> None:
+        if not nodes:
+            return
+        if KnowledgeGraphIndex is None or StorageContext is None:
+            return
+        try:
+            if self._knowledge_index is None:
+                self.ensure_knowledge_index(nodes)
+            else:
+                try:
+                    self._property_graph.upsert_llama_nodes(list(nodes))
+                except AttributeError:  # pragma: no cover - fallback store
+                    pass
+        except RuntimeError:  # pragma: no cover - optional dependency missing
+            return
 
     def _normalise_cypher_record(self, record: Any) -> Dict[str, object]:
         payload: Dict[str, object] = {}
