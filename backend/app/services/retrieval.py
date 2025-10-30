@@ -8,7 +8,20 @@ from itertools import zip_longest
 from time import perf_counter
 from typing import Any, Dict, Iterator, List, Set, Tuple
 
-from qdrant_client.http import models as qmodels
+try:  # pragma: no cover - optional dependency for vector retrieval
+    from qdrant_client.http import models as qmodels
+except ModuleNotFoundError:  # pragma: no cover - fallback for test environments
+    class _StubScoredPoint(dict):
+        """Minimal stand-in for qdrant_client.http.models.ScoredPoint."""
+
+        id: str  # type: ignore[assignment]
+        payload: dict
+        score: float
+
+    class _StubModels:  # pragma: no cover - type stub only
+        ScoredPoint = _StubScoredPoint
+
+    qmodels = _StubModels()  # type: ignore[assignment]
 
 from opentelemetry import metrics, trace
 from opentelemetry.trace import Status, StatusCode
