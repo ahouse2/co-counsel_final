@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import random
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.services.agents import AgentsService
+from backend.app.services.agents import AdaptivePolicyEngine, AgentsService
 from backend.app.services.errors import WorkflowAbort
 from backend.app.storage.agent_memory_store import AgentMemoryStore, AgentThreadRecord
 
@@ -124,6 +126,18 @@ class _StubForensicsService:
     def load_artifact(self, doc_id: str, artifact: str) -> dict[str, object]:
         self.loaded.append(doc_id)
         return {"summary": "Clean", "signals": [], "schema_version": "1.0", "stages": []}
+
+
+class _FlakyDocumentStore(_StubDocumentStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.invocations = 0
+
+    def list_documents(self) -> list[dict[str, str]]:  # type: ignore[override]
+        self.invocations += 1
+        if self.invocations <= 2:
+            raise RuntimeError("workspace manifest unavailable")
+        return super().list_documents()
 
 
 class _TransientRetrievalService:
@@ -276,6 +290,56 @@ def test_agents_service_allows_partial_success(tmp_path: Path) -> None:
     assert any(turn["action"].endswith("failed") for turn in response["turns"])
     assert response["errors"]
     assert any(entry.get("name") == "Strategy" for entry in response["memory"]["conversation"])
+
+
+@pytest.mark.parametrize("seed", [1, 7, 21])
+def test_agents_policy_rewires_graph_across_seeds(tmp_path: Path, seed: int) -> None:
+    document_store = _FlakyDocumentStore()
+    policy_settings = SimpleNamespace(
+        agents_policy_enabled=True,
+        agents_policy_initial_trust=0.5,
+        agents_policy_trust_threshold=0.4,
+        agents_policy_decay=0.0,
+        agents_policy_success_reward=0.15,
+        agents_policy_failure_penalty=0.6,
+        agents_policy_exploration_probability=0.5,
+        agents_policy_seed=seed,
+        agents_policy_observable_roles=("strategy", "ingestion", "research", "cocounsel", "qa"),
+        agents_policy_suppressible_roles=("ingestion", "cocounsel"),
+    )
+    policy_engine = AdaptivePolicyEngine(policy_settings)
+    service = AgentsService(
+        retrieval_service=_SuccessfulRetrievalService(),
+        forensics_service=_StubForensicsService(),
+        document_store=document_store,
+        memory_store=AgentMemoryStore(tmp_path / f"threads-policy-{seed}"),
+        policy_engine=policy_engine,
+    )
+    question = "Summarise integration milestones."
+    case_prefix = f"case-policy-{seed}"
+
+    with pytest.raises(WorkflowAbort):
+        service.run_case(f"{case_prefix}-1", question, autonomy_level="balanced")
+
+    first_decision = policy_engine.last_decision
+    assert first_decision is not None
+    expected_exploration = random.Random(seed).random() < policy_settings.agents_policy_exploration_probability
+    assert first_decision.exploration == expected_exploration
+
+    with pytest.raises(WorkflowAbort):
+        service.run_case(f"{case_prefix}-2", question, autonomy_level="balanced")
+
+    response = service.run_case(f"{case_prefix}-3", question, autonomy_level="balanced")
+    telemetry = response["telemetry"]
+    policy_snapshot = telemetry["policy"]
+
+    assert policy_snapshot["enabled"] is True
+    assert "ingestion" in policy_snapshot["suppressed_roles"]
+    assert policy_snapshot["graph_overrides"]["strategy"] == ["research"]
+    roles = [turn["role"] for turn in response["turns"]]
+    assert "ingestion" not in roles
+    assert policy_snapshot["trust"]["ingestion"] < policy_settings.agents_policy_trust_threshold
+    assert policy_engine.state()["ingestion"] < policy_settings.agents_policy_trust_threshold
 
 
 class _CountingMemoryStore(AgentMemoryStore):
