@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from typing import Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 from uuid import uuid4
 
 from ..services.errors import (
@@ -96,6 +96,7 @@ class MicrosoftAgentsSession:
     actor: Dict[str, object]
     autonomy_policy: Dict[str, bool]
     max_turns: int
+    policy_state: Dict[str, Any] | None = None
 
     def execute(self, context: AgentContext, thread: AgentThread) -> AgentThread:
         # Seed the conversation transcript with the user brief.
@@ -113,6 +114,8 @@ class MicrosoftAgentsSession:
         self.telemetry.setdefault("plan_revisions", 0)
         self.telemetry.setdefault("hand_offs", [])
         self.telemetry.setdefault("notes", [])
+        if self.policy_state:
+            self.telemetry.setdefault("policy", {}).update(self.policy_state)
 
         turns_budget = max(1, self.max_turns)
         plan_revision = 0
@@ -123,6 +126,17 @@ class MicrosoftAgentsSession:
             {"role": role, "revision": None, "reason": None}
             for role in self.graph.order
         ]
+        if self.policy_state:
+            elevated = [
+                str(role)
+                for role in self.policy_state.get("elevated_roles", [])
+                if any(item["role"] == role for item in queue)
+            ]
+            for role in reversed(elevated):
+                for index, item in enumerate(queue):
+                    if item["role"] == role:
+                        queue.insert(0, queue.pop(index))
+                        break
 
         while queue and turns_budget > 0:
             item = queue.pop(0)
@@ -403,6 +417,7 @@ class MicrosoftAgentsOrchestrator:
     max_rounds: int = 12
     tools: Dict[str, AgentTool] = field(init=False)
     graph: SessionGraph = field(init=False)
+    base_definitions: List[AgentDefinition] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.tools = {
@@ -412,8 +427,8 @@ class MicrosoftAgentsOrchestrator:
             "cocounsel": self.forensics_tool,
             "qa": self.qa_tool,
         }
-        definitions = build_agent_graph(self.tools)
-        self.graph = SessionGraph.from_definitions(definitions)
+        self.base_definitions = build_agent_graph(self.tools)
+        self.graph = SessionGraph.from_definitions(self.base_definitions)
 
     def run(
         self,
@@ -428,6 +443,7 @@ class MicrosoftAgentsOrchestrator:
         telemetry: Dict[str, object] | None = None,
         autonomy_level: str = "balanced",
         max_turns: int | None = None,
+        policy_state: Dict[str, Any] | None = None,
     ) -> AgentThread:
         if thread is None:
             thread = AgentThread(
@@ -445,6 +461,10 @@ class MicrosoftAgentsOrchestrator:
         memory = CaseThreadMemory(thread, self.memory_store, state=dict(thread.memory))
         telemetry = telemetry or {}
         telemetry.setdefault("autonomy_level", autonomy_level)
+        if policy_state:
+            telemetry.setdefault("policy", {}).update(policy_state)
+        session_graph = self._build_session_graph(policy_state)
+        self.graph = session_graph
         context = AgentContext(
             case_id=case_id,
             question=question,
@@ -454,15 +474,45 @@ class MicrosoftAgentsOrchestrator:
             telemetry=telemetry,
         )
         session = MicrosoftAgentsSession(
-            graph=self.graph,
+            graph=session_graph,
             memory=memory,
             telemetry=telemetry,
             component_executor=component_executor,
             actor=actor,
             autonomy_policy=self._autonomy_policy(autonomy_level),
             max_turns=max_turns or self.max_rounds,
+            policy_state=policy_state,
         )
         return session.execute(context, thread)
+
+    def _build_session_graph(self, policy_state: Dict[str, Any] | None) -> SessionGraph:
+        if not policy_state or not policy_state.get("enabled", True):
+            return SessionGraph.from_definitions(self.base_definitions)
+        suppressed = {str(role) for role in policy_state.get("suppressed_roles", [])}
+        overrides = {
+            str(source): [str(target) for target in targets]
+            for source, targets in policy_state.get("graph_overrides", {}).items()
+        }
+        definitions = [
+            definition
+            for definition in self.base_definitions
+            if definition.role not in suppressed
+        ]
+        adjusted: List[AgentDefinition] = []
+        for definition in definitions:
+            delegates = list(definition.delegates)
+            if definition.role in overrides:
+                delegates = overrides[definition.role]
+            else:
+                delegates = [
+                    delegate
+                    for delegate in delegates
+                    if delegate.lower() not in suppressed
+                ]
+            adjusted.append(replace(definition, delegates=delegates))
+        if not adjusted:
+            adjusted = list(self.base_definitions)
+        return SessionGraph.from_definitions(adjusted)
 
     @staticmethod
     def _autonomy_policy(level: str) -> Dict[str, bool]:
