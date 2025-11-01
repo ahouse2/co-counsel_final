@@ -72,6 +72,115 @@ def test_merge_properties_handles_evidence_lists() -> None:
     assert appended["evidence"] == ["a", "b", "c"]
 
 
+def test_compute_community_summary(memory_graph: graph_module.GraphService) -> None:
+    memory_graph.upsert_document("doc-community", "Community Doc", {"category": "test"})
+    memory_graph.upsert_entity("entity-alpha", "Entity", {"label": "Alpha"})
+    memory_graph.upsert_entity("entity-beta", "Entity", {"label": "Beta"})
+    memory_graph.merge_relation("doc-community", "MENTIONS", "entity-alpha", {"doc_id": "doc-community"})
+    memory_graph.merge_relation("doc-community", "MENTIONS", "entity-beta", {"doc_id": "doc-community"})
+    memory_graph.merge_relation("entity-alpha", "ASSOCIATED_WITH", "entity-beta", {"doc_id": "doc-community"})
+
+    summary = memory_graph.compute_community_summary({"doc-community", "entity-alpha"})
+    assert summary.total_nodes >= 2
+    assert summary.communities
+    community = summary.communities[0]
+    node_ids = {node["id"] for node in community.nodes}
+    assert {"doc-community", "entity-alpha"}.issubset(node_ids)
+
+
+def test_subgraph_payload(memory_graph: graph_module.GraphService) -> None:
+    memory_graph.upsert_document("doc-subgraph", "Subgraph Doc", {"category": "graph"})
+    memory_graph.upsert_entity("entity-source", "Entity", {"label": "Source"})
+    memory_graph.upsert_entity("entity-target", "Entity", {"label": "Target"})
+    memory_graph.merge_relation(
+        "doc-subgraph",
+        "MENTIONS",
+        "entity-source",
+        {"doc_id": "doc-subgraph", "evidence": ["pg-1"]},
+    )
+    memory_graph.merge_relation(
+        "entity-source",
+        "ASSOCIATED_WITH",
+        "entity-target",
+        {"doc_id": "doc-subgraph", "predicate": "ASSOCIATED_WITH"},
+    )
+
+    subgraph = memory_graph.subgraph(["entity-source", "entity-target"])
+    payload = subgraph.to_payload()
+    node_ids = {node["id"] for node in payload["nodes"]}
+    assert {"entity-source", "entity-target", "doc-subgraph"} <= node_ids
+    assert any(edge["type"] == "ASSOCIATED_WITH" for edge in payload["edges"])
+    assert "doc-subgraph" in subgraph.document_ids()
+
+
+def test_run_cypher_memory(memory_graph: graph_module.GraphService) -> None:
+    memory_graph.upsert_document("doc-cypher", "Cypher Doc", {})
+    result = memory_graph.run_cypher("MATCH (n) RETURN n")
+    assert result["summary"]["mode"] == "memory"
+    assert any(record["n"]["id"] == "doc-cypher" for record in result["records"])
+
+
+def test_build_text_to_cypher_prompt(memory_graph: graph_module.GraphService) -> None:
+    prompt = memory_graph.build_text_to_cypher_prompt("List all documents")
+    assert "List all documents" in prompt
+    assert "Node types" in prompt
+
+
+def test_text_to_cypher_falls_back_to_prompt(memory_graph: graph_module.GraphService) -> None:
+    result = memory_graph.text_to_cypher("List entities")
+    assert result.prompt
+    assert result.cypher == ""
+    assert result.used_generator is False
+    assert result.warnings == []
+
+
+def test_text_to_cypher_uses_property_graph_generator(memory_graph: graph_module.GraphService) -> None:
+    class _StubStore:
+        def __init__(self) -> None:
+            self.text_to_cypher_template = "Schema:{schema}\nQ:{question}"
+            self.calls: list[tuple[str, str | None]] = []
+
+        def text_to_cypher(self, question: str, schema: str | None = None) -> dict:
+            self.calls.append((question, schema))
+            return {"cypher": "MATCH (n) RETURN n", "prompt": "custom"}
+
+    stub = _StubStore()
+    memory_graph._property_graph = stub  # type: ignore[attr-defined]
+    memory_graph._text_to_cypher_template = stub.text_to_cypher_template  # type: ignore[attr-defined]
+
+    result = memory_graph.text_to_cypher("List docs")
+    assert result.cypher == "MATCH (n) RETURN n"
+    assert result.prompt == "custom"
+    assert result.used_generator is True
+    assert stub.calls
+
+
+def test_property_graph_store_receives_nodes(memory_graph: graph_module.GraphService) -> None:
+    store = memory_graph.get_property_graph_store()
+    memory_graph.upsert_document("doc-store", "Store Doc", {})
+    memory_graph.upsert_entity("entity-store", "Entity", {"label": "Stored"})
+    memory_graph.merge_relation(
+        "doc-store",
+        "MENTIONS",
+        "entity-store",
+        {"doc_id": "doc-store"},
+    )
+    if hasattr(store, "graph"):
+        assert "doc-store" in store.graph["nodes"]
+        assert any("entity-store" in key for key in store.graph["relations"].keys())
+
+
+def test_get_knowledge_index_handles_missing_dependency(
+    memory_graph: graph_module.GraphService,
+) -> None:
+    if graph_module.KnowledgeGraphIndex is None or graph_module.StorageContext is None:
+        with pytest.raises(RuntimeError):
+            memory_graph.get_knowledge_index()
+    else:  # pragma: no cover - executed only when llama-index is installed locally
+        index = memory_graph.get_knowledge_index()
+        assert index is not None
+
+
 class _DummyNode(dict):
     def __init__(self, node_id: str, labels: list[str], props: dict[str, object]):
         super().__init__(props)
@@ -175,3 +284,33 @@ def test_graph_service_neo4j_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert any("MERGE (d:Document" in call[0] for call in dummy_driver.write_calls)
     assert any("MATCH (d:Document)-[:MENTIONS]->(e:Entity)" in call[0] for call in dummy_driver.read_calls)
+
+
+def test_synthesize_strategy_brief_maps_arguments(memory_graph: graph_module.GraphService) -> None:
+    service = memory_graph
+    service.upsert_entity("claim-alpha", "Claim", {"label": "Alpha Claim"})
+    service.upsert_entity("evidence-email", "Evidence", {"label": "Email Log"})
+    service.upsert_entity("memo", "Evidence", {"label": "Conflicting Memo"})
+    service.merge_relation(
+        "claim-alpha",
+        "SUPPORTED_BY",
+        "evidence-email",
+        {"doc_id": ["doc-1"], "predicate": "SUPPORTED_BY", "weight": 0.8, "stance": "support"},
+    )
+    service.merge_relation(
+        "memo",
+        "CONTRADICTS",
+        "claim-alpha",
+        {"doc_id": "doc-2", "predicate": "CONTRADICTS", "evidence": ["doc-2"], "stance": "oppose"},
+    )
+
+    brief = service.synthesize_strategy_brief(["claim-alpha"])
+    assert brief.argument_map
+    claim_entry = next(item for item in brief.argument_map if item.node["id"] == "claim-alpha")
+    assert claim_entry.supporting and claim_entry.supporting[0].node["id"] == "evidence-email"
+    assert claim_entry.opposing and claim_entry.opposing[0].node["id"] == "memo"
+    assert brief.contradictions
+    assert brief.focus_nodes
+    assert brief.leverage_points
+    payload = brief.to_dict()
+    assert payload["argument_map"][0]["node"]["id"] == "claim-alpha"

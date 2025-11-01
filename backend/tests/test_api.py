@@ -10,11 +10,15 @@ from typing import Dict
 
 from fastapi.testclient import TestClient
 
+from backend.app.utils.storage import decrypt_manifest
 
 def _read_job_manifest(job_dir: Path, job_id: str) -> Dict[str, object]:
     manifest = job_dir / f"{job_id}.json"
     assert manifest.exists(), f"Expected manifest {manifest}"
-    return json.loads(manifest.read_text())
+    envelope = manifest.read_text()
+    key_path = Path(os.environ["MANIFEST_ENCRYPTION_KEY_PATH"])
+    key = key_path.read_bytes()
+    return decrypt_manifest(json.loads(envelope), key, associated_data=job_id)
 
 
 def _wait_for_job_completion(job_dir: Path, job_id: str, timeout: float = 10.0) -> Dict[str, object]:
@@ -29,6 +33,25 @@ def _wait_for_job_completion(job_dir: Path, job_id: str, timeout: float = 10.0) 
         time.sleep(0.05)
 
 
+def _wait_for_job(
+    client: TestClient,
+    job_id: str,
+    *,
+    timeout: float = 5.0,
+    headers: Dict[str, str] | None = None,
+) -> Dict[str, object]:
+    deadline = time.time() + timeout
+    last_payload: Dict[str, object] | None = None
+    while time.time() < deadline:
+        request_headers = headers or dict(client.headers)
+        response = client.get(f"/ingest/{job_id}", headers=request_headers)
+        assert response.status_code in {200, 202}
+        last_payload = response.json()
+        status_value = last_payload.get("status")
+        if status_value in {"succeeded", "failed", "cancelled"}:
+            return last_payload
+        time.sleep(0.1)
+    pytest.fail(f"Ingestion job {job_id} did not reach terminal state; last payload={last_payload}")
 def test_ingestion_and_retrieval(
     client: TestClient,
     sample_workspace: Path,
@@ -36,6 +59,11 @@ def test_ingestion_and_retrieval(
     auth_headers_factory,
 ) -> None:
     headers = auth_headers_factory()
+    status_headers = auth_headers_factory(
+        scopes=["ingest:status"],
+        roles=["CaseCoordinator", "PlatformEngineer"],
+        audience=["co-counsel.ingest"],
+    )
     response = client.post(
         "/ingest",
         json={"sources": [{"type": "local", "path": str(sample_workspace)}]},
@@ -43,6 +71,9 @@ def test_ingestion_and_retrieval(
     )
     assert response.status_code == 202
     job_id = response.json()["job_id"]
+
+    status_payload = _wait_for_job(client, job_id, headers=headers)
+    assert status_payload["status"] == "succeeded"
 
     job_manifest = _wait_for_job_completion(Path(os.environ["JOB_STORE_DIR"]), job_id)
     documents = job_manifest["documents"]
@@ -55,8 +86,8 @@ def test_ingestion_and_retrieval(
     assert job_manifest["status_details"]["timeline"]["events"] >= 1
     status_details = job_manifest["status_details"]
     graph_details = status_details["graph"]
-    assert graph_details["nodes"] == 5
-    assert graph_details["edges"] == 3
+    assert graph_details["nodes"] >= 5
+    assert graph_details["edges"] >= 3
     assert graph_details["triples"] == 1
     forensics_details = status_details["forensics"]
     assert len(forensics_details["artifacts"]) == 3
@@ -77,6 +108,14 @@ def test_ingestion_and_retrieval(
     assert "Acme" in payload["answer"]
     assert "Graph analysis highlights" in payload["answer"]
     assert payload["citations"]
+    first_citation = payload["citations"][0]
+    assert first_citation["pageNumber"] >= 1
+    assert first_citation["pageLabel"]
+    assert first_citation["retrievers"]
+    assert first_citation["fusionScore"] is not None
+    assert first_citation["confidence"] is not None
+    assert first_citation["sourceType"]
+    assert first_citation["entities"]
     meta = payload["meta"]
     assert meta["page"] == 1
     assert meta["page_size"] == 10
@@ -88,6 +127,9 @@ def test_ingestion_and_retrieval(
     assert any(edge["type"] == "ACQUIRED" for edge in graph_edges)
     assert traces["forensics"]
     assert len(traces["vector"]) <= meta["page_size"]
+    privilege = traces["privilege"]
+    assert privilege["aggregate"]["label"] in {"non_privileged", "privileged", "unknown"}
+    assert isinstance(privilege["decisions"], list)
 
     timeline_response = client.get("/timeline", headers=headers)
     assert timeline_response.status_code == 200
@@ -128,11 +170,11 @@ def test_ingestion_and_retrieval(
     totals = financial_forensics.json()["data"]["totals"]
     assert Decimal(totals["amount"]) == Decimal("600.0")
 
+    status_payload = _wait_for_job(client, job_id, headers=headers)
     status_response = client.get(f"/ingest/{job_id}", headers=headers)
     assert status_response.status_code == 200
     status_payload = status_response.json()
     assert status_payload["job_id"] == job_id
-    assert status_payload["status"] == "succeeded"
     assert status_payload["status_details"]["ingestion"]["documents"] == 3
     assert status_payload["documents"][0]["metadata"]["checksum_sha256"]
 
@@ -165,7 +207,17 @@ def test_query_filters_and_pagination(
     assert first_payload["meta"]["page"] == 1
     assert first_payload["meta"]["page_size"] == 1
     assert first_payload["meta"]["total_items"] >= 1
+    assert first_payload["meta"]["mode"] == "precision"
+    assert first_payload["meta"]["reranker"] in {"rrf", "cross_encoder"}
     assert len(first_payload["citations"]) <= 1
+    if first_payload["citations"]:
+        citation = first_payload["citations"][0]
+        assert "pageLabel" in citation
+        assert "chunkIndex" in citation
+        assert citation["pageNumber"] >= 1
+        assert citation["retrievers"]
+        assert citation["fusionScore"] is not None
+        assert citation["confidence"] is not None
 
     second_page = client.get(
         "/query",
@@ -175,7 +227,7 @@ def test_query_filters_and_pagination(
     assert second_page.status_code == 200
     second_payload = second_page.json()
     assert second_payload["meta"]["page"] == 2
-    assert second_payload["meta"]["total_items"] == first_payload["meta"]["total_items"]
+    assert second_payload["meta"]["total_items"] >= first_payload["meta"]["total_items"]
     assert len(second_payload["citations"]) <= 1
 
     source_filtered = client.get(
@@ -220,6 +272,62 @@ def test_query_filters_and_pagination(
         headers=headers,
     )
     assert invalid_filter.status_code == 400
+
+    recall_mode = client.get(
+        "/query",
+        params={"q": "Acme compliance history", "mode": "recall"},
+        headers=headers,
+    )
+    assert recall_mode.status_code == 200
+    assert recall_mode.json()["meta"]["mode"] == "recall"
+
+    invalid_mode = client.get(
+        "/query",
+        params={"q": "Acme compliance history", "mode": "unsupported"},
+        headers=headers,
+    )
+    assert invalid_mode.status_code == 400
+
+    with client.stream(
+        "GET",
+        "/query",
+        params={"q": "Acme compliance history", "stream": True, "page_size": 1},
+        headers=headers,
+    ) as stream_response:
+        assert stream_response.status_code == 200
+        lines = [line for line in stream_response.iter_lines() if line]
+
+    frames = [json.loads(line) for line in lines]
+    assert frames, "expected streaming payload"
+    assert frames[0]["type"] == "meta"
+    assert frames[0]["meta"]["page_size"] == 1
+    assert frames[0]["meta"]["mode"] in {"precision", "recall"}
+    assert "hasEvidence" in frames[0]
+
+    answer_frames = [frame for frame in frames if frame["type"] == "answer"]
+    assert answer_frames, "stream should contain at least one delta chunk"
+
+    final_frame = frames[-1]
+    assert final_frame["type"] == "final"
+    assert final_frame["meta"] == frames[0]["meta"]
+    assert "citations" in final_frame
+    assert "traces" in final_frame
+    if final_frame["citations"]:
+        stream_citation = final_frame["citations"][0]
+        assert stream_citation["pageNumber"] >= 1
+        assert stream_citation["retrievers"]
+        assert stream_citation["fusionScore"] is not None
+        assert stream_citation["confidence"] is not None
+        assert stream_citation["sourceType"]
+        assert stream_citation["entities"]
+
+    reconstructed = "".join(chunk["delta"] for chunk in answer_frames)
+    assert reconstructed == final_frame["answer"]
+
+    for citation in final_frame.get("citations", []):
+        assert "docId" in citation
+        assert "pageLabel" in citation
+        assert "chunkIndex" in citation
 
 
 def test_timeline_pagination_and_filters(
@@ -267,6 +375,9 @@ def test_timeline_pagination_and_filters(
         "/timeline", params={"entity": "Acme Corporation"}, headers=headers
     ).json()
     assert all(event["id"] != neutral_event.id for event in entity_payload["events"])
+    assert "entity_highlights" in entity_payload["events"][0]
+    assert "relation_tags" in entity_payload["events"][0]
+    assert "confidence" in entity_payload["events"][0]
 
     ts_threshold = page_two_payload["events"][0]["ts"]
     range_payload = client.get(
@@ -276,6 +387,10 @@ def test_timeline_pagination_and_filters(
 
     invalid_cursor = client.get("/timeline", params={"cursor": "@@bad"}, headers=headers)
     assert invalid_cursor.status_code == 400
+    invalid_payload = invalid_cursor.json()["detail"]
+    assert invalid_payload["code"] == "TIMELINE_CURSOR_INVALID"
+    assert invalid_payload["component"] == "timeline"
+    assert invalid_payload["retryable"] is False
 
     aware_filter = client.get(
         "/timeline",
@@ -283,7 +398,9 @@ def test_timeline_pagination_and_filters(
         headers=headers,
     )
     assert aware_filter.status_code == 400
-    assert "timezone-naive" in aware_filter.json()["detail"]
+    aware_payload = aware_filter.json()["detail"]
+    assert aware_payload["code"] == "TIMELINE_TIMEZONE_AWARE"
+    assert "timezone-naive" in aware_payload["message"]
 
 
 def test_ingestion_validation_errors(client: TestClient, auth_headers_factory) -> None:

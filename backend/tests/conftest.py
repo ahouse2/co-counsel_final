@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
-import importlib
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import sys
-from typing import Iterable, Sequence
+from typing import Sequence
 
 import jwt
 import pytest
@@ -15,16 +14,13 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-from PIL import Image
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from PIL import Image, ImageDraw
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend.app import config  # noqa: E402
-from backend.app.security.dependencies import reset_security_caches  # noqa: E402
+from backend.app import config
+from backend.app.security.dependencies import reset_security_caches
+from backend.app.utils.audit import reset_audit_trail
 
 
 @dataclass
@@ -177,7 +173,21 @@ def security_materials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Secur
     cert_path.write_bytes(client_cert.public_bytes(serialization.Encoding.PEM))
 
     registry_path = tmp_path / "registry.json"
-    _write_registry(registry_path, client_cert=client_cert, tenant_id=tenant_id, client_id=client_id, roles=["CaseCoordinator", "ResearchAnalyst", "ComplianceAuditor", "PlatformEngineer", "ForensicsOperator"])
+    _write_registry(
+        registry_path,
+        client_cert=client_cert,
+        tenant_id=tenant_id,
+        client_id=client_id,
+        roles=[
+            "CaseCoordinator",
+            "ResearchAnalyst",
+            "ComplianceAuditor",
+            "PlatformEngineer",
+            "ForensicsOperator",
+            "CustomerSuccessManager",
+            "ExecutiveSponsor",
+        ],
+    )
 
     jwks_path = tmp_path / "jwks.json"
     _write_jwks(jwks_path, client_key.public_key())
@@ -225,6 +235,9 @@ def auth_headers_factory(security_materials: SecurityMaterials):
         "forensics:financial",
         "agents:run",
         "agents:read",
+        "billing:read",
+        "knowledge:read",
+        "knowledge:write",
     ]
     default_roles = [
         "CaseCoordinator",
@@ -240,6 +253,8 @@ def auth_headers_factory(security_materials: SecurityMaterials):
         "co-counsel.graph",
         "co-counsel.forensics",
         "co-counsel.agents",
+        "co-counsel.billing",
+        "co-counsel.knowledge",
     ]
 
     def factory(
@@ -272,7 +287,9 @@ def sample_workspace(tmp_path: Path) -> Path:
     )
 
     image = root / "evidence.png"
-    img = Image.new("RGB", (16, 16), color=(123, 45, 67))
+    img = Image.new("RGB", (240, 80), color="white")
+    draw = ImageDraw.Draw(img)
+    draw.text((10, 20), "Acme 2024-10-02", fill="black")
     img.save(image)
 
     csv_file = root / "ledger.csv"
@@ -294,17 +311,40 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, security_materials: 
     monkeypatch.setenv("JOB_STORE_DIR", str(storage_root / "jobs"))
     monkeypatch.setenv("DOCUMENT_STORE_DIR", str(storage_root / "documents"))
     monkeypatch.setenv("INGESTION_WORKSPACE_DIR", str(storage_root / "workspaces"))
+    monkeypatch.setenv("INGESTION_CHROMA_DIR", str(storage_root / "chroma"))
+    monkeypatch.setenv("INGESTION_LLAMA_CACHE_DIR", str(storage_root / "llama_cache"))
     monkeypatch.setenv("AGENT_THREADS_DIR", str(storage_root / "agent_threads"))
+    monkeypatch.setenv("BILLING_USAGE_PATH", str(storage_root / "billing" / "usage.json"))
+    repo_root = Path(__file__).resolve().parents[2]
+    monkeypatch.setenv("KNOWLEDGE_CATALOG_PATH", str(repo_root / "docs/knowledge/catalog.json"))
+    monkeypatch.setenv("KNOWLEDGE_CONTENT_DIR", str(repo_root / "docs/knowledge/best_practices"))
+    monkeypatch.setenv("KNOWLEDGE_PROGRESS_PATH", str(storage_root / "knowledge" / "progress.json"))
+    monkeypatch.setenv("VOICE_SESSIONS_DIR", str(storage_root / "voice" / "sessions"))
+    monkeypatch.setenv("VOICE_CACHE_DIR", str(storage_root / "voice" / "cache"))
+    monkeypatch.setenv("COST_TRACKING_PATH", str(storage_root / "costs" / "events.jsonl"))
+    monkeypatch.setenv("VECTOR_BACKEND", "memory")
+    monkeypatch.setenv("INGESTION_COST_MODE", "community")
+    monkeypatch.setenv("INGESTION_HF_MODEL", "local://tests")
+    key_path = storage_root / "manifest.key"
+    key_path.write_bytes(os.urandom(32))
+    audit_log_path = storage_root / "audit.log"
+    monkeypatch.setenv("MANIFEST_ENCRYPTION_KEY_PATH", str(key_path))
+    monkeypatch.setenv("AUDIT_LOG_PATH", str(audit_log_path))
 
     from backend.app import config as app_config
     from backend.app.services import graph as graph_service
     from backend.app.services import vector as vector_service
+    from backend.app.telemetry.billing import reset_billing_registry
 
     app_config.reset_settings_cache()
     reset_security_caches()
+    reset_audit_trail()
     vector_service.reset_vector_service()
     graph_service.reset_graph_service()
+    reset_billing_registry()
 
+    settings = app_config.get_settings()
     main_module = importlib.import_module("backend.app.main")
     importlib.reload(main_module)
-    return TestClient(main_module.app)
+    client_instance = TestClient(main_module.app)
+    return client_instance
