@@ -56,6 +56,7 @@ Run
 - PRPs: see `AgentsMD_PRPs_and_AgentMemory/PRPs/*` — base, planning, spec, tasks
 - Rebuilt TRD/PRP: `AgentsMD_PRPs_and_AgentMemory/PRPs/ai_docs/TRD-PRP_legal_tech_2_rebuilt_msagents_llamaindex_swarms.md`
 - Reference SDKs: `Reference Code/agent-framework-main`, `Reference Code/llama-hub`, `swarms-master/`
+- Dev Team console: open the “Dev Team” workspace section to review `/dev-agent/proposals` backlog, inspect sandbox validation output, and approve proposals (requires `dev-agent:admin` scope or PlatformEngineer/AutomationService roles).
 
 ## 5) Dev Workflow
 - Draft/refine PRPs; implement minimal diffs; validate via gates
@@ -78,6 +79,8 @@ Run
 ## 9) Docs & Resources
 - PRP templates under `AgentsMD_PRPs_and_AgentMemory/PRPs/templates/`
 - Process commands under `AgentsMD_PRPs_and_AgentMemory/.codex/commands/` (e.g., `validate-doc-links`, `sync-reference-assets`; see `rapid-development/experimental/prp-analyze-run.md` for the analysis log template)
+- KnowledgeOps toolkit overview in `agents/toolkit/README.md`
+- Runbooks: [Research Agent](AgentsMD_PRPs_and_AgentMemory/PRPs/RUNBOOK_KnowledgeOps_Research_Agent.md) · [Compliance Agent](AgentsMD_PRPs_and_AgentMemory/PRPs/RUNBOOK_KnowledgeOps_Compliance_Agent.md)
 
 ## 10) Next Steps Checklist
 1. Read PRP base/spec/planning/tasks

@@ -23,6 +23,29 @@ version: 0.2
 - **Emergency Elevation**: Break-glass access escalates to `PlatformEngineer` with one-time approval codes; actions must be
   reconciled within 24 hours in the audit ledger.
 
+### Knowledge Hub API Surface
+
+- **Purpose**: Serve curated legal best-practice lessons (Trial University) with LlamaIndex-backed semantic search and
+  per-principal learning telemetry.
+- **Endpoints**:
+  - `POST /knowledge/search` — Accepts `{ query, limit, filters }`; returns scored section snippets with elapsed time metadata.
+  - `GET /knowledge/lessons` — Lists lesson summaries alongside completion ratios, bookmark state, and available filter facets.
+  - `GET /knowledge/lessons/{lesson_id}` — Streams markdown sections + media attachments tailored with the caller's progress
+    state.
+  - `POST /knowledge/lessons/{lesson_id}/progress` — Mutates section completion (requires `knowledge:write`).
+  - `POST /knowledge/lessons/{lesson_id}/bookmark` — Toggles bookmarks for quick recall (requires `knowledge:write`).
+- **Scopes/Roles**:
+  - Read (`knowledge:read`): `ResearchAnalyst`, `CaseCoordinator`, `ComplianceAuditor` (case admins inherit).
+  - Write (`knowledge:write`): `ResearchAnalyst`, `CaseCoordinator` for progress/bookmark persistence.
+- **Persistence & Indexing**:
+  - Catalog: `docs/knowledge/catalog.json` referencing markdown dossiers in `docs/knowledge/best_practices/`.
+  - Profile store: encrypted manifest at `storage/knowledge/progress.json`, keyed by `{tenant}:{subject}`.
+  - Search: Sections chunked + embedded via shared ingestion runtime, hydrated into a LlamaIndex `VectorStoreIndex` with
+    keyword fallback when optional deps absent.
+- **Agent Touchpoints**:
+  - Agents can `get_knowledge_service()` to pre-load lessons, cite curated steps, or augment analysis with best-practice
+    checklists.
+
 ### POST /ingest
 **Summary**: Queue document sources for processing. Implemented via `backend.app.models.api.IngestionRequest` ➜ `IngestionResponse`.
 
@@ -44,8 +67,15 @@ version: 0.2
 | Field | Type | Required | Validation Rules | Notes |
 | --- | --- | --- | --- | --- |
 | `type` | string | yes | Enum: `local`, `sharepoint`, `s3`, `onedrive`, `web` | Drives downstream connector selection |
-| `path` | string | conditional | Required when `type == "local"`; must resolve under configured mount | Absolute or relative path |
-| `credRef` | string | conditional | Required when `type` is not `local`; must match credentials registry key | Secrets fetched server-side |
+| `path` | string | conditional | Required for `local`, `onedrive`, and `web` sources. For `local` it must resolve under configured mount; for `onedrive` supply folder relative to drive root; for `web` provide HTTP(S) URL | Absolute path, relative drive path, or URL |
+| `credRef` | string | conditional | Required for `sharepoint`, `s3`, and `onedrive`; must match credentials registry key | Secrets fetched server-side |
+
+**Connector behaviour**
+- `local` — Reads files from on-disk workspace. Validation ensures directory existence.
+- `s3` — Requires optional dependency `boto3`; downloads bucket objects into a per-job workspace. Credential payload must include `bucket` and key material.
+- `sharepoint` — Uses `Office365-REST-Python-Client` to traverse folders with client credentials.
+- `onedrive` — Uses Microsoft Graph via `msal` + `httpx`. Credential payload must include `tenant_id`, `client_id`, `client_secret`, and `drive_id`. The optional dependency `msal` must be installed.
+- `web` — Fetches a single HTTP(S) URL via `httpx` and stores the response body. Non-2xx responses fail the job with `502`.
 
 ```json
 {
@@ -92,7 +122,7 @@ version: 0.2
 | 422 | `{"detail": "Unsupported ingestion source type"}` |
 
 ### GET /ingest/{job_id}
-**Summary**: Poll ingestion status for asynchronous lifecycle. Response model to be introduced as `backend.app.models.api.IngestionStatusResponse`.
+**Summary**: Poll ingestion status for asynchronous lifecycle. Implemented via `backend.app.models.api.IngestionStatusResponse`.
 
 | Aspect | Value |
 | --- | --- |
@@ -104,7 +134,7 @@ version: 0.2
 | Success Codes | `200 OK` when terminal state reached, `202 Accepted` when still processing |
 | Error Codes | `404 Not Found` if job unknown, `410 Gone` if history expired |
 
-#### Response Schema — `IngestionStatusResponse` (planned)
+#### Response Schema — `IngestionStatusResponse`
 | Field | Type | Validation Rules | Notes |
 | --- | --- | --- | --- |
 | `job_id` | string | RFC 4122 UUID | Echoes request identifier |
@@ -140,8 +170,8 @@ version: 0.2
 #### Lifecycle Semantics
 | Stage | Description |
 | --- | --- |
-| Initial Response | `202 Accepted` with `status="queued"`; clients persist `job_id` for polling. |
-| Polling Loop | Continue requests until `status` is `succeeded` (all downstream artifacts materialized) or `failed` (see `errors`). |
+| Initial Response | `202 Accepted` with `status="queued"`; manifests persisted immediately for `/ingest/{job_id}`. |
+| Polling Loop | Service returns `202 Accepted` while `status` is `queued` or `running`; transitions to `200 OK` once job enters a terminal state (`succeeded`, `failed`, or `cancelled`). |
 | Caching | Clients MAY send `If-None-Match`; service SHOULD return `304 Not Modified` when status unchanged. |
 
 ### GET /query
@@ -695,3 +725,10 @@ sequenceDiagram
 - Reference hardware: 8 vCPU (3.0 GHz Ryzen 7840HS class), 32 GB RAM, NVMe SSD (3.2 GB/s sequential read), no discrete GPU required.
 - Network: \<=40 ms RTT to vector and graph stores during validation, 1 Gbps LAN.
 - Detailed load profiles and execution guidance are catalogued in [docs/validation/nfr_validation_matrix.md](../../validation/nfr_validation_matrix.md).
+
+### 2025-11-21 · GraphRAG Operational Alignment
+- Integrate LlamaIndex `KnowledgeGraphIndex` abstractions with Neo4j + NetworkX backends via `GraphService` property graph adapters.
+- Expose `GraphService.get_knowledge_index()` for agent runtimes so LlamaIndex-based tools can operate on the synchronised property graph without bespoke wiring.
+- Post-ingestion pipeline executes community detection (greedy modularity with fallback) and persists summaries for retrieval + agent tooling.
+- Timeline enrichment now triggered immediately after ingestion with graph-aware highlights, tracked in job manifests.
+- Agents toolkit exposes `run_cypher`, schema description, and text-to-Cypher prompt builders for ad-hoc exploration.
