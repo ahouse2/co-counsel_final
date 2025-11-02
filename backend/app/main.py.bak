@@ -1,5 +1,4 @@
-﻿from __future__ import annotations
-import os
+from __future__ import annotations
 
 import base64
 import time
@@ -151,7 +150,9 @@ from .storage.settings_store import SettingsStoreError
 settings = get_settings()
 setup_telemetry(settings)
 app = FastAPI(title=settings.app_name, version=settings.app_version)
-# [dev] mTLS disabled (commented by script)
+app.add_middleware(MTLSMiddleware, config=create_mtls_config())
+
+
 def _apply_graphql_cors_headers(request: Request, response: Response) -> None:
     """Ensure GraphQL HTTP responses include negotiated CORS headers."""
 
@@ -1374,5 +1375,3 @@ def _scenario_run_options(payload: ScenarioRunRequestModel) -> ScenarioRunOption
         use_tts=payload.enable_tts,
         director_overrides=director_overrides,
     )
-
-

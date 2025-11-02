@@ -1,17 +1,14 @@
 import { useEffect, useId, useState } from 'react';
-import { CitationPanel } from '@/components/CitationPanel';
-import { TimelineView } from '@/components/TimelineView';
-import { KnowledgeHub } from '@/components/KnowledgeHub';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { DevTeamSection } from '@/components/dev-team';
 import { CinematicMetrics } from '@/components/CinematicMetrics';
-import { EvidenceUploadZone } from '@/components/EvidenceUploadZone';
-import { GraphExplorerPanel } from '@/components/GraphExplorerPanel';
-import { TrialUniversityPanel } from '@/components/TrialUniversityPanel';
-import { LiveCoCounselPanel } from '@/components/LiveCoCounselPanel';
-import { MockTrialArenaPanel } from '@/components/MockTrialArenaPanel';
+import { EvidenceUploadZone } from '@/components/evidence/EvidenceUploadZone';
+import { GraphExplorerPanel } from '@/components/graph-explorer/GraphExplorerPanel';
+import { TrialUniversityPanel } from '@/components/trial-university/TrialUniversityPanel';
+import { MockTrialArenaPanel } from '@/components/mock-trial/MockTrialArenaPanel';
+import { CinematicDesignSystemDemo } from '@/components/CinematicDesignSystemDemo';
 import { useQueryContext } from '@/context/QueryContext';
 
 const sections = [
@@ -20,6 +17,7 @@ const sections = [
   { id: 'documents', label: 'Evidence' },
   { id: 'trial-university', label: 'Trial University' },
   { id: 'mock-court', label: 'Mock Trial' },
+  { id: 'design-system', label: 'Design System' },
   { id: 'dev-team', label: 'Dev Team' },
 ] as const;
 
@@ -78,12 +76,12 @@ function App(): JSX.Element {
   }, []);
 
   return (
-    <div className="cinematic-app" data-section={activeSection}>
-      <div className="cinematic-backdrop" aria-hidden />
+    <div className="cinematic-app ds-app-cinematic" data-section={activeSection}>
+      <div className="cinematic-backdrop ds-bg-parallax" aria-hidden />
       <a href="#main" className="skip-link">
         Skip to content
       </a>
-      <header className="cinematic-header" role="banner">
+      <header className="cinematic-header ds-header-cinematic" role="banner">
         <div className="header-brand">
           <span aria-hidden className="brand-emblem">
             ⚖️
@@ -100,8 +98,8 @@ function App(): JSX.Element {
           <OfflineIndicator />
         </div>
       </header>
-      <div className="cinematic-body">
-        <aside className="cinematic-nav" role="navigation" aria-labelledby={tabsId}>
+      <div className="cinematic-body ds-body-cinematic">
+        <aside className="cinematic-nav ds-nav-cinematic" role="navigation" aria-labelledby={tabsId}>
           <h2 id={tabsId} className="sr-only">
             Workspace sections
           </h2>
@@ -114,7 +112,7 @@ function App(): JSX.Element {
                   id={`${tabsId}-${section.id}`}
                   aria-controls={`${panelId}-${section.id}`}
                   aria-selected={activeSection === section.id}
-                  className={activeSection === section.id ? 'active' : ''}
+                  className={`ds-btn-accent ${activeSection === section.id ? 'active' : ''}`}
                   onClick={() => setActiveSection(section.id)}
                 >
                   <span className="tab-glow" aria-hidden />
@@ -124,7 +122,7 @@ function App(): JSX.Element {
             ))}
           </ul>
         </aside>
-        <main id="main" className="cinematic-main" role="main">
+        <main id="main" className="cinematic-main ds-main-cinematic" role="main">
           <CinematicMetrics />
           <section
             id={`${panelId}-chat`}
@@ -132,7 +130,15 @@ function App(): JSX.Element {
             aria-labelledby={`${tabsId}-chat`}
             hidden={activeSection !== 'chat'}
           >
-            <LiveCoCounselPanel />
+            <div className="panel-shell ds-card-cinematic p-6">
+              <header>
+                <h2>Co-Counsel Chat</h2>
+                <p>AI-powered legal assistant with real-time collaboration.</p>
+              </header>
+              <div className="mt-4 p-4 bg-background-panel rounded-lg border border-border-subtle">
+                <p className="text-text-secondary">Chat interface would be implemented here...</p>
+              </div>
+            </div>
           </section>
           <section
             id={`${panelId}-timeline`}
@@ -140,12 +146,14 @@ function App(): JSX.Element {
             aria-labelledby={`${tabsId}-timeline`}
             hidden={activeSection !== 'timeline'}
           >
-            <div className="panel-shell">
+            <div className="panel-shell ds-card-cinematic p-6">
               <header>
                 <h2>Timeline Pulse</h2>
                 <p>Adaptive chronology with neon event markers and deposition overlays.</p>
               </header>
-              <TimelineView />
+              <div className="mt-4 p-4 bg-background-panel rounded-lg border border-border-subtle">
+                <p className="text-text-secondary">Timeline view would be implemented here...</p>
+              </div>
             </div>
           </section>
           <section
@@ -156,12 +164,14 @@ function App(): JSX.Element {
           >
             <EvidenceUploadZone />
             <GraphExplorerPanel />
-            <div className="panel-shell">
+            <div className="panel-shell ds-card-cinematic p-6">
               <header>
                 <h2>Evidence Citations</h2>
                 <p>Source-grounded references with privilege posture indicators.</p>
               </header>
-              <CitationPanel />
+              <div className="mt-4 p-4 bg-background-panel rounded-lg border border-border-subtle">
+                <p className="text-text-secondary">Citation panel would be implemented here...</p>
+              </div>
             </div>
           </section>
           <section
@@ -171,12 +181,14 @@ function App(): JSX.Element {
             hidden={activeSection !== 'trial-university'}
           >
             <TrialUniversityPanel />
-            <div className="panel-shell">
+            <div className="panel-shell ds-card-cinematic p-6">
               <header>
                 <h2>Knowledge Hub</h2>
                 <p>Cinematic dossiers, briefs, and AI explainers ready for court.</p>
               </header>
-              <KnowledgeHub />
+              <div className="mt-4 p-4 bg-background-panel rounded-lg border border-border-subtle">
+                <p className="text-text-secondary">Knowledge hub would be implemented here...</p>
+              </div>
             </div>
           </section>
           <section
@@ -188,12 +200,26 @@ function App(): JSX.Element {
             <MockTrialArenaPanel />
           </section>
           <section
+            id={`${panelId}-design-system`}
+            role="tabpanel"
+            aria-labelledby={`${tabsId}-design-system`}
+            hidden={activeSection !== 'design-system'}
+          >
+            <div className="panel-shell ds-card-cinematic p-6">
+              <header>
+                <h2>Cinematic Design System</h2>
+                <p>Premium dark-mode UI components and design guidelines.</p>
+              </header>
+              <CinematicDesignSystemDemo />
+            </div>
+          </section>
+          <section
             id={`${panelId}-dev-team`}
             role="tabpanel"
             aria-labelledby={`${tabsId}-dev-team`}
             hidden={activeSection !== 'dev-team'}
           >
-            <div className="panel-shell">
+            <div className="panel-shell ds-card-cinematic p-6">
               <header>
                 <h2>Dev Team Workspace</h2>
                 <p>Velocity dashboards, backlog intelligence, and agent orchestration.</p>
