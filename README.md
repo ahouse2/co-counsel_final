@@ -33,7 +33,7 @@ To set up and run the Co-Counsel project locally:
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-repo/co-counsel.git
+    git clone https://github.com/ahouse2/co-counsel.git
     cd co-counsel
     ```
 
