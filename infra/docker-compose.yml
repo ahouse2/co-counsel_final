@@ -1,15 +1,5 @@
 version: '3.9'
 
-x-gpu-capable: &gpu-capable
-  deploy:
-    resources:
-      reservations:
-        devices:
-          - capabilities:
-              - gpu
-            count: ${GPU_DEVICE_COUNT:-0}
-            driver: ${GPU_DRIVER:-nvidia}
-
 services:
   api:
     build:
@@ -97,37 +87,36 @@ services:
     networks:
       - backend
 
-  stt:
-    <<: *gpu-capable
-    image: ghcr.io/guillaumekln/faster-whisper-server:latest
-    profiles:
-      - community
-      - pro
-      - enterprise
-      - gpu
-    environment:
-      - ASR_MODEL=${STT_MODEL_NAME:-openai/whisper-small}
-      - ASR_ENGINE=faster_whisper
-      - ASR_BEAM_SIZE=5
-      - ASR_DEVICE=${STT_DEVICE:-cpu}
-      - HUGGINGFACE_HUB_CACHE=/models/huggingface
-      - ASR_OUTPUT_LANGUAGE=${STT_OUTPUT_LANGUAGE:-en}
-    ports:
-      - "9000:9000"
-    volumes:
-      - ../var/models/huggingface:/models/huggingface
-      - ../var/models/whisper:/models/whisper
-    networks:
-      - backend
+  # stt:
+  #   <<: *gpu-capable
+  #   image: ghcr.io/etalab-ia/faster-whisper-server/cuda:latest
+  #   profiles:
+  #     - community
+  #     - pro
+  #     - enterprise
+  #     - gpu
+  #   environment:
+  #     - ASR_MODEL=${STT_MODEL_NAME:-openai/whisper-small}
+  #     - ASR_ENGINE=faster_whisper
+  #     - ASR_BEAM_SIZE=5
+  #     - ASR_DEVICE=${STT_DEVICE:-cpu}
+  #     - HUGGINGFACE_HUB_CACHE=/models/huggingface
+  #     - ASR_OUTPUT_LANGUAGE=${STT_OUTPUT_LANGUAGE:-en}
+  #   ports:
+  #     - "9000:9000"
+  #   volumes:
+  #     - ../var/models/huggingface:/models/huggingface
+  #     - ../var/models/whisper:/models/whisper
+  #   networks:
+  #     - backend
 
   tts:
-    <<: *gpu-capable
     image: rhasspy/larynx:latest
+    runtime: runc
     profiles:
       - community
       - pro
       - enterprise
-      - gpu
     environment:
       - LARYNX_VOICE=${TTS_VOICE:-en-us-blizzard_lessac}
       - LARYNX_OUTPUT_DIR=/output
@@ -155,25 +144,6 @@ services:
     networks:
       - backend
 
-  grafana:
-    image: grafana/grafana-oss:11.1.4
-    profiles:
-      - enterprise
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - otel-collector
-    networks:
-      - backend
-
   storage-backup:
     image: ghcr.io/offen/docker-volume-backup:latest
     profiles:
@@ -195,12 +165,24 @@ services:
     networks:
       - backend
 
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    profiles:
+      - community
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - backend
+
 volumes:
   neo4j_data:
   qdrant_data:
   api_data:
   voice_models:
-  grafana_data:
 
 networks:
   backend:

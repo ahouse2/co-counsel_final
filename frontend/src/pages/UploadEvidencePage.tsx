@@ -31,21 +31,21 @@ const UploadEvidencePage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Upload Evidence</h1>
+    <div className="cds-main-cinematic">
+      <h1 className="text-3xl font-bold text-text-primary mb-4">Upload Evidence</h1>
 
       {message && (
-        <div className={`p-3 mb-4 rounded-md ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className={`p-3 mb-4 rounded-md ${message.type === 'success' ? 'bg-accent-green/20 text-accent-green border border-accent-green/40' : 'bg-accent-red/20 text-accent-red border border-accent-red/40'}`}>
           {message.text}
         </div>
       )}
 
       <div className="mb-4">
-        <label htmlFor="caseId" className="block text-sm font-medium text-gray-700">Case ID:</label>
+        <label htmlFor="caseId" className="block text-sm font-medium text-text-secondary">Case ID:</label>
         <input
           type="text"
           id="caseId"
-          className="mt-1 block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="cds-input-cinematic mt-1 block w-full"
           value={caseId}
           onChange={(e) => setCaseId(e.target.value)}
         />
@@ -57,30 +57,30 @@ const UploadEvidencePage: React.FC = () => {
         onUploadError={handleUploadError}
       />
 
-      <h2 className="text-xl font-bold mt-8 mb-4">Uploaded Documents</h2>
+      <h2 className="text-xl font-bold text-text-primary mt-8 mb-4">Uploaded Documents</h2>
       {
         uploadedDocuments.length === 0 ? (
-          <p>No documents uploaded yet.</p>
+          <p className="text-text-secondary">No documents uploaded yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto cds-card-cinematic p-4">
+            <table className="min-w-full divide-y divide-border-default">
+              <thead className="bg-background-panel">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categories</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doc ID</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">File Name</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">Type</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">Status</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">Categories</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider">Doc ID</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-background-surface divide-y divide-border-subtle">
                 {uploadedDocuments.map((doc) => (
                   <tr key={doc.doc_id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{doc.file_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doc.doc_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doc.ingestion_status}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doc.pipeline_result.join(', ')}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doc.doc_id}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-primary">{doc.file_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{doc.doc_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{doc.ingestion_status}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{doc.pipeline_result.join(', ')}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{doc.doc_id}</td>
                   </tr>
                 ))}
               </tbody>

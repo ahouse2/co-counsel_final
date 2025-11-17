@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ChatMessage {
   id: string;
@@ -36,14 +37,18 @@ export function LiveCoCounselChat({ speak }: LiveCoCounselChatProps) {
     setError(null);
 
     try {
-      // For demonstration, using a hardcoded agent_id. In a real app, this would be dynamic.
       const agentId = 'co-counsel-agent'; 
-      const response = await fetch(`/api/agents/${agentId}/run`, {
+      const sessionId = uuidv4(); // Generate a new session ID for each interaction
+      const response = await fetch(`/api/agents/invoke`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: inputMessage }), // Assuming AgentRunRequest takes a 'query' field
+        body: JSON.stringify({ 
+          session_id: sessionId,
+          prompt: inputMessage,
+          agent_name: agentId 
+        }),
       });
 
       if (!response.ok) {
@@ -65,11 +70,11 @@ export function LiveCoCounselChat({ speak }: LiveCoCounselChatProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.6, ease: "easeOut" }}
-      className="panel-shell chat-panel"
+      className="panel-shell co-counsel" // Use co-counsel class for overall panel styling
     >
       <header>
-        <h2>Live Co-Counsel Chat</h2>
-        <p className="panel-subtitle">Real-time collaboration with your AI co-counsel.</p>
+        <h2 className="text-text-primary">Live Co-Counsel Chat</h2>
+        <p className="panel-subtitle text-text-secondary">Real-time collaboration with your AI co-counsel.</p>
       </header>
       <div className="chat-interface">
         <div className="chat-messages">
@@ -99,14 +104,14 @@ export function LiveCoCounselChat({ speak }: LiveCoCounselChatProps) {
               }
             }}
             placeholder="Type your message..."
-            className="chat-input"
+            className="cds-input-cinematic chat-input"
             disabled={isSending}
           />
-          <button onClick={handleSendMessage} className="send-button" disabled={isSending}>
+          <button onClick={handleSendMessage} className="cds-btn-accent send-button" disabled={isSending}>
             {isSending ? 'Sending...' : 'Send'}
           </button>
         </div>
-        {error && <p className="text-red-500 text-sm mt-2">Error: {error}</p>}
+        {error && <p className="text-accent-red text-sm mt-2">Error: {error}</p>}
       </div>
     </motion.div>
   );

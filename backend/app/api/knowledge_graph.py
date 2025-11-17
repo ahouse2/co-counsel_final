@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from typing import List, Dict, Any, Optional
 
 from backend.app.knowledge_graph.schema import KnowledgeGraphData, BaseNode, BaseRelationship
 from backend.app.services.knowledge_graph_service import KnowledgeGraphService, get_knowledge_graph_service
+from toolsnteams_previous.knowledge_graph_manager import KnowledgeGraphManager
 
 router = APIRouter()
 
@@ -54,3 +55,99 @@ async def query_knowledge_graph_mermaid(
         return mermaid_definition
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate Mermaid graph: {e}")
+
+# New endpoints for KnowledgeGraphManager methods
+
+@router.post("/cypher-query", summary="Run a raw Cypher query", response_model=List[Dict[str, Any]])
+async def run_cypher_query(
+    query: str = Body(..., embed=True),
+    params: Optional[Dict[str, Any]] = Body(None, embed=True),
+    cache: bool = Query(True),
+):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        result = kg_manager.run_query(query, params, cache)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cypher query failed: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/legal-references/search", summary="Search legal references", response_model=List[Dict[str, Any]])
+async def search_legal_references(query: str = Query(...)):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        results = kg_manager.search_legal_references(query)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/node/{node_id}", summary="Retrieve a node by ID", response_model=Optional[Dict[str, Any]])
+async def get_node_by_id(node_id: int):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        node = kg_manager.get_node(node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+        return node
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve node: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/node/{node_id}/relationships", summary="Retrieve relationships for a node", response_model=List[Dict[str, Any]])
+async def get_node_relationships(node_id: int):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        relationships = kg_manager.get_relationships(node_id)
+        return relationships
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve relationships: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/export-graph", summary="Export the entire graph as an interactive HTML file", response_model=str)
+async def export_graph(output_path: str = Query("graph.html")):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        html_path = kg_manager.export_graph(output_path)
+        return html_path
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export graph: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/cause-subgraph/{cause}", summary="Retrieve subgraph for a cause of action", response_model=Dict[str, List[Dict[str, Any]]])
+async def get_cause_subgraph(cause: str):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        nodes, edges = kg_manager.get_cause_subgraph(cause)
+        return {"nodes": nodes, "edges": edges}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve cause subgraph: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/cause-support-scores", summary="Return satisfaction counts and confidence for each cause of action", response_model=List[Dict[str, Any]])
+async def get_cause_support_scores():
+    kg_manager = KnowledgeGraphManager()
+    try:
+        scores = kg_manager.cause_support_scores()
+        return scores
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve cause support scores: {e}")
+    finally:
+        kg_manager.close()
+
+@router.get("/subgraph/{label}", summary="Retrieve a subgraph for nodes with a given label", response_model=Dict[str, List[Dict[str, Any]]])
+async def get_subgraph_by_label(label: str):
+    kg_manager = KnowledgeGraphManager()
+    try:
+        nodes, edges = kg_manager.get_subgraph(label)
+        return {"nodes": nodes, "edges": edges}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve subgraph by label: {e}")
+    finally:
+        kg_manager.close()

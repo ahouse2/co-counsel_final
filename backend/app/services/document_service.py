@@ -34,6 +34,7 @@ class DocumentService:
         keywords: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
         custom_metadata: Optional[dict] = None,
+        relative_path: Optional[str] = None, # New parameter
         origin: str = "upload",
     ) -> dict:
         doc_id = str(uuid.uuid4())
@@ -45,7 +46,8 @@ class DocumentService:
             author,
             keywords,
             tags,
-            custom_metadata
+            custom_metadata,
+            relative_path # Pass relative_path to document_store
         )
 
         # Trigger ingestion pipeline
@@ -64,6 +66,7 @@ class DocumentService:
                 "keywords": keywords,
                 "tags": tags,
                 "custom_metadata": custom_metadata,
+                "relative_path": relative_path, # Include relative_path in metadata
             }
         )
 

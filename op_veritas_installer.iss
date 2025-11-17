@@ -41,38 +41,3 @@ Source: "E:\projects\op_veritas_2\*"; DestDir: "{app}"; Flags: ignoreversion rec
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-
-[Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-
-[Code]
-function IsDockerInstalled(): Boolean;
-var
-  DockerExePath: String;
-begin
-  // First, try to detect Docker Desktop via its registry key
-  if RegKeyExists(HKLM, 'SOFTWARE\Docker Inc.\Docker Desktop') then begin
-    Result := True;
-    Exit;
-  end;
-
-  // If the registry key is not found, check for the default installation path of docker.exe
-  DockerExePath := ExpandConstant('{pf}\Docker\Docker\resources\bin\docker.exe');
-  if FileExists(DockerExePath) then begin
-    Result := True;
-    Exit;
-  end;
-
-  // If neither check passes, Docker is considered not installed
-  Result := False;
-end;
-
-function InitializeSetup(): Boolean;
-begin
-  Result := True; // Allow setup to continue by default
-
-  if not IsDockerInstalled() then begin
-    MsgBox('Docker Desktop is not installed on this system. Please install Docker Desktop before proceeding with this setup.', mbError, MB_OK);
-    Result := False; // Abort setup
-  end;
-end;

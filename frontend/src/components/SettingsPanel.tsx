@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettingsContext } from '@/context/SettingsContext';
 import { ProviderCatalogEntry, ThemePreference } from '@/types';
+import { cn } from '@/lib/utils';
 
 type TabId = 'providers' | 'credentials' | 'research' | 'appearance';
 
@@ -19,7 +20,15 @@ function capabilityModels(
   return provider.models.filter((model) => model.capabilities.includes(capability));
 }
 
-export function SettingsPanel(): JSX.Element {
+interface SettingsPanelProps {
+  triggerVariant?: 'default' | 'icon';
+  triggerLabel?: string;
+}
+
+export function SettingsPanel({
+  triggerVariant = 'default',
+  triggerLabel = 'Settings',
+}: SettingsPanelProps): JSX.Element {
   const {
     settings,
     catalog,
@@ -54,12 +63,8 @@ export function SettingsPanel(): JSX.Element {
     setChatModel(defaults['chat'] ?? '');
     setEmbeddingModel(defaults['embeddings'] ?? '');
     setVisionModel(defaults['vision'] ?? '');
-    setProviderKeys({});
-    setKeysToClear({});
-    setCourtListenerToken('');
-    setClearCourtListener(false);
-    setResearchToken('');
-    setClearResearchToken(false);
+    // Do NOT reset providerKeys, courtListenerToken, researchToken here.
+    // These should only be cleared when the panel is closed or explicitly by the user.
   }, [settings]);
 
   useEffect(() => {
@@ -188,9 +193,9 @@ export function SettingsPanel(): JSX.Element {
     <form className="settings-form" onSubmit={handleProvidersSubmit}>
       <fieldset disabled={saving || loading}>
         <legend className="sr-only">Provider selection</legend>
-        <label>
+        <label className="text-text-secondary">
           Primary provider
-          <select value={primaryProvider} onChange={(event) => setPrimaryProvider(event.target.value)}>
+          <select className="cds-input-cinematic" value={primaryProvider} onChange={(event) => setPrimaryProvider(event.target.value)}>
             {providerCatalog.map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.display_name}
@@ -198,9 +203,9 @@ export function SettingsPanel(): JSX.Element {
             ))}
           </select>
         </label>
-        <label>
+        <label className="text-text-secondary">
           Secondary provider
-          <select value={secondaryProvider} onChange={(event) => setSecondaryProvider(event.target.value)}>
+          <select className="cds-input-cinematic" value={secondaryProvider} onChange={(event) => setSecondaryProvider(event.target.value)}>
             <option value="">None</option>
             {providerCatalog
               .filter((entry) => entry.id !== primaryProvider)
@@ -211,9 +216,9 @@ export function SettingsPanel(): JSX.Element {
               ))}
           </select>
         </label>
-        <label>
+        <label className="text-text-secondary">
           Chat model
-          <select value={chatModel} onChange={(event) => setChatModel(event.target.value)}>
+          <select className="cds-input-cinematic" value={chatModel} onChange={(event) => setChatModel(event.target.value)}>
             {capabilityModels(selectedPrimary, 'chat').map((model) => (
               <option key={model.id} value={model.id}>
                 {model.display_name}
@@ -221,9 +226,9 @@ export function SettingsPanel(): JSX.Element {
             ))}
           </select>
         </label>
-        <label>
+        <label className="text-text-secondary">
           Embedding model
-          <select value={embeddingModel} onChange={(event) => setEmbeddingModel(event.target.value)}>
+          <select className="cds-input-cinematic" value={embeddingModel} onChange={(event) => setEmbeddingModel(event.target.value)}>
             {capabilityModels(selectedPrimary, 'embeddings').map((model) => (
               <option key={model.id} value={model.id}>
                 {model.display_name}
@@ -231,9 +236,9 @@ export function SettingsPanel(): JSX.Element {
             ))}
           </select>
         </label>
-        <label>
+        <label className="text-text-secondary">
           Vision model
-          <select value={visionModel} onChange={(event) => setVisionModel(event.target.value)}>
+          <select className="cds-input-cinematic" value={visionModel} onChange={(event) => setVisionModel(event.target.value)}>
             {capabilityModels(selectedPrimary, 'vision').map((model) => (
               <option key={model.id} value={model.id}>
                 {model.display_name}
@@ -242,7 +247,7 @@ export function SettingsPanel(): JSX.Element {
           </select>
         </label>
         <div className="form-actions">
-          <button type="submit" disabled={saving}>
+          <button type="submit" disabled={saving} className="cds-btn-accent">
             Save provider preferences
           </button>
         </div>
@@ -256,10 +261,11 @@ export function SettingsPanel(): JSX.Element {
         <legend className="sr-only">Provider credentials</legend>
         {providerCatalog.map((entry) => (
           <div key={entry.id} className="credentials-field">
-            <label>
+            <label className="text-text-secondary">
               {entry.display_name} API key
               <input
                 type="password"
+                className="cds-input-cinematic"
                 placeholder={providerStatus.get(entry.id) ? 'Stored' : 'Enter API key'}
                 value={providerKeys[entry.id] ?? ''}
                 onChange={(event) =>
@@ -270,7 +276,7 @@ export function SettingsPanel(): JSX.Element {
             {providerStatus.get(entry.id) && (
               <button
                 type="button"
-                className="link-button"
+                className="link-button text-accent-cyan hover:text-accent-cyan-300"
                 onClick={() =>
                   setKeysToClear((current) => ({ ...current, [entry.id]: !current[entry.id] }))
                 }
@@ -281,7 +287,7 @@ export function SettingsPanel(): JSX.Element {
           </div>
         ))}
         <div className="form-actions">
-          <button type="submit" disabled={saving}>
+          <button type="submit" disabled={saving} className="cds-btn-accent">
             Save credentials
           </button>
         </div>
@@ -293,10 +299,11 @@ export function SettingsPanel(): JSX.Element {
     <form className="settings-form" onSubmit={handleResearchSubmit}>
       <fieldset disabled={saving || loading}>
         <legend className="sr-only">Research integrations</legend>
-        <label>
+        <label className="text-text-secondary">
           CourtListener token
           <input
             type="password"
+            className="cds-input-cinematic"
             placeholder={serviceStatus.courtlistener ? 'Stored' : 'Enter token'}
             value={courtListenerToken}
             onChange={(event) => setCourtListenerToken(event.target.value)}
@@ -305,16 +312,17 @@ export function SettingsPanel(): JSX.Element {
         {serviceStatus.courtlistener && (
           <button
             type="button"
-            className="link-button"
+            className="link-button text-accent-cyan hover:text-accent-cyan-300"
             onClick={() => setClearCourtListener((current) => !current)}
           >
             {clearCourtListener ? 'Keep stored token' : 'Remove stored token'}
           </button>
         )}
-        <label>
+        <label className="text-text-secondary">
           Research browser API key
           <input
             type="password"
+            className="cds-input-cinematic"
             placeholder={serviceStatus.research_browser ? 'Stored' : 'Enter API key'}
             value={researchToken}
             onChange={(event) => setResearchToken(event.target.value)}
@@ -323,14 +331,14 @@ export function SettingsPanel(): JSX.Element {
         {serviceStatus.research_browser && (
           <button
             type="button"
-            className="link-button"
+            className="link-button text-accent-cyan hover:text-accent-cyan-300"
             onClick={() => setClearResearchToken((current) => !current)}
           >
             {clearResearchToken ? 'Keep stored key' : 'Remove stored key'}
           </button>
         )}
         <div className="form-actions">
-          <button type="submit" disabled={saving}>
+          <button type="submit" disabled={saving} className="cds-btn-accent">
             Save research credentials
           </button>
         </div>
@@ -352,7 +360,9 @@ export function SettingsPanel(): JSX.Element {
                 checked={themePreference === value}
                 onChange={() => handleThemeChange(value)}
               />
-              {value === 'system' ? 'Match system' : value === 'light' ? 'Light' : 'Dark'}
+              <span className="text-text-secondary">
+                {value === 'system' ? 'Match system' : value === 'light' ? 'Light' : 'Dark'}
+              </span>
             </label>
           ))}
         </div>
@@ -379,17 +389,22 @@ export function SettingsPanel(): JSX.Element {
     <div className="settings-panel">
       <button
         type="button"
-        className="settings-trigger"
+        className={cn('settings-trigger', triggerVariant === 'icon' && 'settings-trigger-icon')}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        ⚙ Settings
+        <i className="fa-solid fa-gear" aria-hidden />
+        {triggerVariant === 'icon' ? (
+          <span className="sr-only">{triggerLabel}</span>
+        ) : (
+          <span>{triggerLabel}</span>
+        )}
       </button>
       {open && (
         <div className="settings-surface" role="dialog" aria-modal="false">
           <header className="settings-header">
-            <h2>Application settings</h2>
-            {error ? <p className="settings-error">{error}</p> : null}
+            <h2 className="text-text-primary">Application settings</h2>
+            {error ? <p className="settings-error text-accent-red">{error}</p> : null}
           </header>
           <div className="settings-body">
             <nav className="settings-tabs" aria-label="Settings categories">

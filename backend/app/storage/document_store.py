@@ -47,6 +47,7 @@ class DocumentStore:
         keywords: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
         custom_metadata: Optional[dict] = None,
+        relative_path: Optional[str] = None, # New parameter
     ) -> str:
         """
         Saves and encrypts a document, returning its version.
@@ -64,6 +65,7 @@ class DocumentStore:
             "tags": tags,
             "custom_metadata": custom_metadata,
             "created_at": current_time,
+            "relative_path": relative_path, # Include relative_path in metadata
         }
         storage_path.with_suffix(".meta").write_text(json.dumps(metadata))
 

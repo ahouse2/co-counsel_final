@@ -21,6 +21,8 @@ from opentelemetry import metrics, trace
 from opentelemetry.trace import Status, StatusCode
 
 from ..config import get_settings
+import zipfile
+import shutil
 from ..models.api import IngestionRequest, IngestionSource
 from ..security.authz import Principal
 from ..storage.document_store import DocumentStore
@@ -241,6 +243,84 @@ class IngestionService:
         record = self.job_store.read_job(job_id)
         record.setdefault("job_id", job_id)
         return record
+
+    async def ingest_document(
+        self, principal: Principal, document_id: str, file: UploadFile
+    ) -> IngestionResponse:
+        temp_dir = Path(self.settings.ingestion_temp_dir) / document_id
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        file_path = temp_dir / file.filename
+        with open(file_path, "wb") as buffer:
+            while content := await file.read(1024):
+                buffer.write(content)
+
+        source = IngestionSource(type="file", path=str(file_path))
+        request = IngestionRequest(sources=[source])
+        job_id = self.ingest(request, principal)
+        return IngestionResponse(job_id=job_id, status="queued")
+
+    async def ingest_text(
+        self, principal: Principal, document_id: str, text: str
+    ) -> IngestionResponse:
+        temp_dir = Path(self.settings.ingestion_temp_dir) / document_id
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        file_path = temp_dir / f"{document_id}.txt"
+        with open(file_path, "w", encoding="utf-8") as buffer:
+            buffer.write(text)
+
+        source = IngestionSource(type="text", path=str(file_path))
+        request = IngestionRequest(sources=[source])
+        job_id = self.ingest(request, principal)
+        return IngestionResponse(job_id=job_id, status="queued")
+
+    async def ingest_directory(
+        self, principal: Principal, document_id: str, file: UploadFile
+    ) -> IngestionResponse:
+        if not file.filename.endswith(".zip"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only .zip files are supported for directory uploads",
+            )
+
+        temp_zip_path = Path(self.settings.ingestion_temp_dir) / f"{document_id}.zip"
+        temp_extract_dir = Path(self.settings.ingestion_temp_dir) / document_id
+
+        # Save the uploaded zip file
+        with open(temp_zip_path, "wb") as buffer:
+            while content := await file.read(1024):
+                buffer.write(content)
+
+        # Unzip the file
+        try:
+            with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
+                zip_ref.extractall(temp_extract_dir)
+        except zipfile.BadZipFile as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid zip file provided",
+            ) from exc
+        finally:
+            temp_zip_path.unlink() # Clean up the zip file
+
+        sources: List[IngestionSource] = []
+        for path in temp_extract_dir.rglob("*"):
+            if path.is_file():
+                sources.append(IngestionSource(type="file", path=str(path)))
+        
+        if not sources:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No files found in the uploaded directory",
+            )
+
+        request = IngestionRequest(sources=sources)
+        job_id = self.ingest(request, principal)
+
+        # Clean up the extracted directory after ingestion is queued
+        # The actual processing happens asynchronously, so we can clean up now.
+        shutil.rmtree(temp_extract_dir)
+
+        return IngestionResponse(job_id=job_id, status="queued")
 
     # region async execution
 

@@ -5,17 +5,17 @@ export function CinematicDesignSystemDemo() {
   const [progress, setProgress] = useState(65);
 
   return (
-    <div className="ds-app-cinematic">
-      <div className="ds-bg-parallax" aria-hidden="true" />
+    <div className="cds-app-cinematic">
+      <div className="cds-bg-parallax" aria-hidden="true" />
       
-      <header className="ds-header-cinematic">
+      <header className="cds-header-cinematic">
         <div>
-          <h1 className="ds-text-primary ds-font-display ds-text-4xl">Cinematic Design System</h1>
-          <p className="ds-text-secondary ds-mt-2">Showcasing premium dark-mode UI components</p>
+          <h1 className="text-text-primary font-display text-4xl">Cinematic Design System</h1>
+          <p className="text-text-secondary mt-2">Showcasing premium dark-mode UI components</p>
         </div>
-        <div className="ds-flex ds-gap-3">
+        <div className="flex gap-3">
           <button 
-            className="ds-btn-accent"
+            className="cds-btn-accent"
             onMouseEnter={() => setIsGlowing(true)}
             onMouseLeave={() => setIsGlowing(false)}
           >
@@ -24,66 +24,66 @@ export function CinematicDesignSystemDemo() {
         </div>
       </header>
 
-      <div className="ds-body-cinematic">
-        <nav className="ds-nav-cinematic">
-          <ul className="ds-flex ds-flex-col ds-gap-2">
+      <div className="cds-body-cinematic">
+        <nav className="cds-nav-cinematic">
+          <ul className="flex flex-col gap-2">
             <li>
-              <button className="ds-w-full ds-text-left ds-p-3 ds-bg-surface ds-rounded-lg ds-text-primary ds-border ds-border-default hover:ds-bg-panel ds-transition-medium">
+              <button className="w-full text-left p-3 bg-background-surface rounded-lg text-text-primary border border-border-default hover:bg-background-panel transition-medium">
                 Dashboard
               </button>
             </li>
             <li>
-              <button className="ds-w-full ds-text-left ds-p-3 ds-bg-surface ds-rounded-lg ds-text-primary ds-border ds-border-default hover:ds-bg-panel ds-transition-medium">
+              <button className="w-full text-left p-3 bg-background-surface rounded-lg text-text-primary border border-border-default hover:bg-background-panel transition-medium">
                 Evidence
               </button>
             </li>
             <li>
-              <button className="ds-w-full ds-text-left ds-p-3 ds-bg-surface ds-rounded-lg ds-text-primary ds-border ds-border-default hover:ds-bg-panel ds-transition-medium">
+              <button className="w-full text-left p-3 bg-background-surface rounded-lg text-text-primary border border-border-default hover:bg-background-panel transition-medium">
                 Graph Explorer
               </button>
             </li>
           </ul>
         </nav>
 
-        <main className="ds-main-cinematic">
-          <div className="ds-grid ds-grid-cols-1 md:ds-grid-cols-2 ds-gap-8">
+        <main className="cds-main-cinematic">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Color Palette Showcase */}
-            <div className="ds-card-cinematic ds-p-6">
-              <h2 className="ds-text-primary ds-font-display ds-text-2xl ds-mb-4">Color Palette</h2>
+            <div className="cds-card-cinematic p-6">
+              <h2 className="text-text-primary font-display text-2xl mb-4">Color Palette</h2>
               
-              <div className="ds-grid ds-grid-cols-2 ds-gap-4">
-                <div className="ds-flex ds-flex-col ds-gap-2">
-                  <div className="ds-text-xs ds-text-secondary">Backgrounds</div>
-                  <div className="ds-flex ds-flex-col ds-gap-2">
-                    <div className="ds-flex ds-items-center ds-gap-2">
-                      <div className="ds-w-8 ds-h-8 ds-rounded ds-bg-canvas"></div>
-                      <span className="ds-text-sm ds-text-secondary">#101217</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="text-xs text-text-secondary">Backgrounds</div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded bg-background-canvas"></div>
+                      <span className="text-sm text-text-secondary">#101217</span>
                     </div>
-                    <div className="ds-flex ds-items-center ds-gap-2">
-                      <div className="ds-w-8 ds-h-8 ds-rounded ds-bg-surface"></div>
-                      <span className="ds-text-sm ds-text-secondary">#181a1e</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded bg-background-surface"></div>
+                      <span className="text-sm text-text-secondary">#181a1e</span>
                     </div>
-                    <div className="ds-flex ds-items-center ds-gap-2">
-                      <div className="ds-w-8 ds-h-8 ds-rounded ds-bg-panel"></div>
-                      <span className="ds-text-sm ds-text-secondary">#22232a</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded bg-background-panel"></div>
+                      <span className="text-sm text-text-secondary">#22232a</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="ds-flex ds-flex-col ds-gap-2">
-                  <div className="ds-text-xs ds-text-secondary">Accents</div>
-                  <div className="ds-flex ds-flex-col ds-gap-2">
-                    <div className="ds-flex ds-items-center ds-gap-2">
-                      <div className="ds-w-8 ds-h-8 ds-rounded ds-bg-cyan-500"></div>
-                      <span className="ds-text-sm ds-text-secondary">Cyan</span>
+                <div className="flex flex-col gap-2">
+                  <div className="text-xs text-text-secondary">Accents</div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded bg-accent-cyan-500"></div>
+                      <span className="text-sm text-text-secondary">Cyan</span>
                     </div>
-                    <div className="ds-flex ds-items-center ds-gap-2">
-                      <div className="ds-w-8 ds-h-8 ds-rounded ds-bg-violet-500"></div>
-                      <span className="ds-text-sm ds-text-secondary">Violet</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded bg-accent-violet-500"></div>
+                      <span className="text-sm text-text-secondary">Violet</span>
                     </div>
-                    <div className="ds-flex ds-items-center ds-gap-2">
-                      <div className="ds-w-8 ds-h-8 ds-rounded ds-bg-amber-400"></div>
-                      <span className="ds-text-sm ds-text-secondary">Gold</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded bg-accent-gold"></div>
+                      <span className="text-sm text-text-secondary">Gold</span>
                     </div>
                   </div>
                 </div>
@@ -91,142 +91,142 @@ export function CinematicDesignSystemDemo() {
             </div>
 
             {/* Typography Showcase */}
-            <div className="ds-card-cinematic ds-p-6">
-              <h2 className="ds-text-primary ds-font-display ds-text-2xl ds-mb-4">Typography</h2>
+            <div className="cds-card-cinematic p-6">
+              <h2 className="text-text-primary font-display text-2xl mb-4">Typography</h2>
               
-              <div className="ds-flex ds-flex-col ds-gap-3">
-                <h1 className="ds-font-display ds-text-4xl ds-text-primary">Display Heading</h1>
-                <h2 className="ds-font-display ds-text-2xl ds-text-primary">Section Heading</h2>
-                <p className="ds-text-secondary">
+              <div className="flex flex-col gap-3">
+                <h1 className="font-display text-4xl text-text-primary">Display Heading</h1>
+                <h2 className="font-display text-2xl text-text-primary">Section Heading</h2>
+                <p className="text-text-secondary">
                   Body text with secondary color for regular content. Uses Inter font family for optimal readability.
                 </p>
-                <p className="ds-font-mono ds-text-sm ds-text-tertiary">
+                <p className="font-mono text-sm text-text-tertiary">
                   Monospace text for code or data displays.
                 </p>
               </div>
             </div>
 
             {/* Component Showcase */}
-            <div className="ds-card-cinematic ds-p-6">
-              <h2 className="ds-text-primary ds-font-display ds-text-2xl ds-mb-4">Interactive Components</h2>
+            <div className="cds-card-cinematic p-6">
+              <h2 className="text-text-primary font-display text-2xl mb-4">Interactive Components</h2>
               
-              <div className="ds-flex ds-flex-col ds-gap-4">
-                <div className="ds-flex ds-flex-col ds-gap-2">
-                  <label className="ds-text-sm ds-text-secondary">Input Field</label>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-text-secondary">Input Field</label>
                   <input 
                     type="text" 
-                    className="ds-input-cinematic" 
+                    className="cds-input-cinematic" 
                     placeholder="Enter case details..."
                   />
                 </div>
                 
-                <div className="ds-flex ds-flex-col ds-gap-2">
-                  <label className="ds-text-sm ds-text-secondary">Progress Indicator</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-text-secondary">Progress Indicator</label>
                   <progress 
-                    className="ds-progress-cinematic ds-w-full" 
+                    className="cds-progress-cinematic w-full" 
                     value={progress} 
                     max="100"
                   />
-                  <div className="ds-flex ds-justify-between ds-text-xs ds-text-tertiary">
+                  <div className="flex justify-between text-xs text-text-tertiary">
                     <span>0%</span>
                     <span>{progress}%</span>
                     <span>100%</span>
                   </div>
                 </div>
                 
-                <div className="ds-flex ds-gap-3 ds-items-center">
-                  <div className="ds-status-indicator"></div>
-                  <span className="ds-text-sm ds-text-secondary">Active Case</span>
+                <div className="flex gap-3 items-center">
+                  <div className="cds-status-indicator"></div>
+                  <span className="text-sm text-text-secondary">Active Case</span>
                   
-                  <div className="ds-status-indicator ds-status-indicator--warning ds-ml-4"></div>
-                  <span className="ds-text-sm ds-text-secondary">Review Needed</span>
+                  <div className="cds-status-indicator cds-status-indicator--warning ml-4"></div>
+                  <span className="text-sm text-text-secondary">Review Needed</span>
                   
-                  <div className="ds-status-indicator ds-status-indicator--error ds-ml-4"></div>
-                  <span className="ds-text-sm ds-text-secondary">Urgent</span>
+                  <div className="cds-status-indicator cds-status-indicator--error ml-4"></div>
+                  <span className="text-sm text-text-secondary">Urgent</span>
                 </div>
               </div>
             </div>
 
             {/* Glowing Elements */}
-            <div className="ds-card-cinematic ds-p-6">
-              <h2 className="ds-text-primary ds-font-display ds-text-2xl ds-mb-4">Glowing Effects</h2>
+            <div className="cds-card-cinematic p-6">
+              <h2 className="text-text-primary font-display text-2xl mb-4">Glowing Effects</h2>
               
-              <div className="ds-flex ds-flex-col ds-gap-6 ds-items-center ds-justify-center ds-h-full">
+              <div className="flex flex-col gap-6 items-center justify-center h-full">
                 <div 
-                  className={`ds-node-glow ds-w-24 ds-h-24 ds-flex ds-items-center ds-justify-center ${
-                    isGlowing ? 'ds-animate-node-glow' : ''
+                  className={`cds-node-glow w-24 h-24 flex items-center justify-center ${
+                    isGlowing ? 'cds-animate-node-glow' : ''
                   }`}
                 >
-                  <span className="ds-text-holo ds-font-display ds-text-xl">AI</span>
+                  <span className="cds-text-holo font-display text-xl">AI</span>
                 </div>
                 
-                <div className="ds-flex ds-gap-4">
-                  <div className="ds-glow-cyan-xs ds-w-12 ds-h-12 ds-rounded-full"></div>
-                  <div className="ds-glow-violet-xs ds-w-12 ds-h-12 ds-rounded-full"></div>
-                  <div className="ds-glow-cyan-md ds-w-12 ds-h-12 ds-rounded-full"></div>
+                <div className="flex gap-4">
+                  <div className="cds-glow-cyan-xs w-12 h-12 rounded-full"></div>
+                  <div className="cds-glow-violet-xs w-12 h-12 rounded-full"></div>
+                  <div className="cds-glow-cyan-md w-12 h-12 rounded-full"></div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Full-width Showcase */}
-          <div className="ds-card-cinematic ds-p-6 ds-mt-8">
-            <h2 className="ds-text-primary ds-font-display ds-text-2xl ds-mb-4">Dashboard Metrics</h2>
+          <div className="cds-card-cinematic p-6 mt-8">
+            <h2 className="text-text-primary font-display text-2xl mb-4">Dashboard Metrics</h2>
             
-            <div className="ds-grid ds-grid-cols-1 md:ds-grid-cols-4 ds-gap-6">
-              <div className="ds-bg-panel ds-rounded-xl ds-p-5 ds-border ds-border-default">
-                <div className="ds-flex ds-justify-between ds-items-start">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-background-panel rounded-xl p-5 border border-border-default">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="ds-text-secondary ds-text-sm">Cases Processed</p>
-                    <p className="ds-font-display ds-text-3xl ds-text-primary ds-mt-1">142</p>
+                    <p className="text-text-secondary text-sm">Cases Processed</p>
+                    <p className="font-display text-3xl text-text-primary mt-1">142</p>
                   </div>
-                  <div className="ds-status-indicator"></div>
+                  <div className="cds-status-indicator"></div>
                 </div>
-                <div className="ds-flex ds-items-center ds-mt-3">
-                  <span className="ds-text-xs ds-text-green-400">+12%</span>
-                  <span className="ds-text-xs ds-text-secondary ds-ml-2">from last week</span>
+                <div className="flex items-center mt-3">
+                  <span className="text-xs text-accent-green">+12%</span>
+                  <span className="text-xs text-text-secondary ml-2">from last week</span>
                 </div>
               </div>
               
-              <div className="ds-bg-panel ds-rounded-xl ds-p-5 ds-border ds-border-default">
-                <div className="ds-flex ds-justify-between ds-items-start">
+              <div className="bg-background-panel rounded-xl p-5 border border-border-default">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="ds-text-secondary ds-text-sm">Evidence Files</p>
-                    <p className="ds-font-display ds-text-3xl ds-text-primary ds-mt-1">1,284</p>
+                    <p className="text-text-secondary text-sm">Evidence Files</p>
+                    <p className="font-display text-3xl text-text-primary mt-1">1,284</p>
                   </div>
-                  <div className="ds-status-indicator ds-status-indicator--warning"></div>
+                  <div className="cds-status-indicator cds-status-indicator--warning"></div>
                 </div>
-                <div className="ds-flex ds-items-center ds-mt-3">
-                  <span className="ds-text-xs ds-text-amber-400">+5.3%</span>
-                  <span className="ds-text-xs ds-text-secondary ds-ml-2">from last week</span>
+                <div className="flex items-center mt-3">
+                  <span className="text-xs text-accent-gold">+5.3%</span>
+                  <span className="text-xs text-text-secondary ml-2">from last week</span>
                 </div>
               </div>
               
-              <div className="ds-bg-panel ds-rounded-xl ds-p-5 ds-border ds-border-default">
-                <div className="ds-flex ds-justify-between ds-items-start">
+              <div className="bg-background-panel rounded-xl p-5 border border-border-default">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="ds-text-secondary ds-text-sm">AI Accuracy</p>
-                    <p className="ds-font-display ds-text-3xl ds-text-primary ds-mt-1">94.7%</p>
+                    <p className="text-text-secondary text-sm">AI Accuracy</p>
+                    <p className="font-display text-3xl text-text-primary mt-1">94.7%</p>
                   </div>
-                  <div className="ds-status-indicator"></div>
+                  <div className="cds-status-indicator"></div>
                 </div>
-                <div className="ds-flex ds-items-center ds-mt-3">
-                  <span className="ds-text-xs ds-text-green-400">+2.1%</span>
-                  <span className="ds-text-xs ds-text-secondary ds-ml-2">from last week</span>
+                <div className="flex items-center mt-3">
+                  <span className="text-xs text-accent-green">+2.1%</span>
+                  <span className="text-xs text-text-secondary ml-2">from last week</span>
                 </div>
               </div>
               
-              <div className="ds-bg-panel ds-rounded-xl ds-p-5 ds-border ds-border-default">
-                <div className="ds-flex ds-justify-between ds-items-start">
+              <div className="bg-background-panel rounded-xl p-5 border border-border-default">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="ds-text-secondary ds-text-sm">Team Productivity</p>
-                    <p className="ds-font-display ds-text-3xl ds-text-primary ds-mt-1">87%</p>
+                    <p className="text-text-secondary text-sm">Team Productivity</p>
+                    <p className="font-display text-3xl text-text-primary mt-1">87%</p>
                   </div>
-                  <div className="ds-status-indicator"></div>
+                  <div className="cds-status-indicator"></div>
                 </div>
-                <div className="ds-flex ds-items-center ds-mt-3">
-                  <span className="ds-text-xs ds-text-green-400">+8.4%</span>
-                  <span className="ds-text-xs ds-text-secondary ds-ml-2">from last week</span>
+                <div className="flex items-center mt-3">
+                  <span className="text-xs text-accent-green">+8.4%</span>
+                  <span className="text-xs text-text-secondary ml-2">from last week</span>
                 </div>
               </div>
             </div>

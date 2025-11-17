@@ -18,12 +18,16 @@ interface UploadDocumentResponse {
 export const uploadDocument = async (
   caseId: string,
   docType: 'my_documents' | 'opposition_documents',
-  file: File
+  file: File,
+  relativePath: string = '' // Add relativePath parameter
 ): Promise<UploadDocumentResponse> => {
   const formData = new FormData();
   formData.append('case_id', caseId);
   formData.append('doc_type', docType);
   formData.append('file', file);
+  if (relativePath) {
+    formData.append('relative_path', relativePath);
+  }
 
   const response = await axios.post<UploadDocumentResponse>(`${API_BASE_URL}/upload`, formData, {
     headers: {

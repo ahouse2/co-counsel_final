@@ -112,6 +112,18 @@ from .api import documents
 
 app.include_router(documents.router)
 
+from .api import document_drafting
+app.include_router(document_drafting.router)
+
+from .api import binder_preparation
+app.include_router(binder_preparation.router)
+
+from .api import feedback
+app.include_router(feedback.router)
+
+from .api import mock_trial
+app.include_router(mock_trial.router)
+
 from .api import forensics
 
 app.include_router(forensics.router, prefix="/forensics", tags=["Forensics"])
@@ -131,6 +143,10 @@ app.include_router(users.router, prefix="/api", tags=["Users"])
 from .api import cases
 
 app.include_router(cases.router, prefix="/api", tags=["Cases"])
+
+from .api import trial_university
+
+app.include_router(trial_university.router)
 
 from .database import engine, Base
 from .models import service_of_process, document, recipient, user, role, user_role, permission, role_permission

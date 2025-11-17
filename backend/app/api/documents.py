@@ -37,6 +37,7 @@ async def upload_document(
     case_id: str,
     doc_type: str, # "my_documents" or "opposition_documents"
     file: UploadFile = File(...),
+    relative_path: Optional[str] = None, # New parameter for relative path
     author: Optional[str] = None,
     keywords: Optional[List[str]] = None,
     tags: Optional[List[str]] = None,
@@ -55,7 +56,8 @@ async def upload_document(
         author,
         keywords,
         tags,
-        custom_metadata
+        custom_metadata,
+        relative_path # Pass relative_path to the service
     )
     return {"message": "Document uploaded and ingestion initiated successfully", "data": result}
 

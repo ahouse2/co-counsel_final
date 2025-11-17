@@ -193,6 +193,57 @@ class KnowledgeGraphService:
             record = await result.single()
             return record["properties"] if record else {}
 
+    async def get_case_context(self, case_id: str) -> Dict[str, Any]:
+        """
+        Retrieves comprehensive context for a given case from the knowledge graph.
+        """
+        driver = await self._get_driver()
+        async with driver.session() as session:
+            context = {"case_id": case_id}
+
+            # Get case summary
+            summary_query = """
+                MATCH (c:Case {id: $case_id})
+                RETURN c.summary AS summary
+            """
+            summary_result = await session.run(summary_query, case_id=case_id)
+            summary_record = await summary_result.single()
+            context["summary"] = summary_record["summary"] if summary_record else "No summary found."
+
+            # Get related documents
+            documents_query = """
+                MATCH (c:Case {id: $case_id})-[:RELATES_TO]->(d:Document)
+                RETURN d.id AS document_id, d.title AS document_title, d.type AS document_type
+            """
+            documents_result = await session.run(documents_query, case_id=case_id)
+            context["documents"] = [record.data() for record in await documents_result.data()]
+
+            # Get involved parties
+            parties_query = """
+                MATCH (c:Case {id: $case_id})-[:INVOLVES]->(p:Party)
+                RETURN p.id AS party_id, p.name AS party_name, p.role AS party_role
+            """
+            parties_result = await session.run(parties_query, case_id=case_id)
+            context["parties"] = [record.data() for record in await parties_result.data()]
+
+            # Get key legal theories
+            theories_query = """
+                MATCH (c:Case {id: $case_id})-[:BASED_ON]->(t:LegalTheory)
+                RETURN t.id AS theory_id, t.name AS theory_name, t.description AS theory_description
+            """
+            theories_result = await session.run(theories_query, case_id=case_id)
+            context["legal_theories"] = [record.data() for record in await theories_result.data()]
+
+            # Get relevant precedents
+            precedents_query = """
+                MATCH (c:Case {id: $case_id})-[:CITES]->(p:Precedent)
+                RETURN p.id AS precedent_id, p.title AS precedent_title, p.citation AS precedent_citation
+            """
+            precedents_result = await session.run(precedents_query, case_id=case_id)
+            context["precedents"] = [record.data() for record in await precedents_result.data()]
+
+            return context
+
 def get_knowledge_graph_service() -> KnowledgeGraphService:
     """
     Dependency function to provide a KnowledgeGraphService instance.

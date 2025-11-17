@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ForensicAnalysisResult, CryptoTracingResult } from '@/services/forensics_api'; // Assuming these types exist
 import { getForensicAnalysis, getCryptoTracing } from '@/services/forensics_api';
-import { CryptoGraphViewer } from '@/components/CryptoGraphViewer'; // Assuming this component exists
+import CryptoGraphViewer from '@/components/CryptoGraphViewer'; // Assuming this component exists
 
-interface ForensicsReportPageParams {
+interface ForensicsReportPageParams extends Record<string, string | undefined> {
   caseId: string;
   docType: string;
   docId: string;

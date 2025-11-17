@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MockTrialArena } from '@/components/MockTrialArena';
+import MockTrialArena from './MockTrialArena';
 
 export function MockTrialArenaPanel() {
   return (
@@ -12,7 +12,7 @@ export function MockTrialArenaPanel() {
     >
       <header>
         <h2>Mock Trial Arena</h2>
-        <p className="panel-subtitle">Simulate and practice trial scenarios with AI.</p>
+        <p className="panel-subtitle text-text-secondary">Simulate and practice trial scenarios with AI.</p>
       </header>
       <MockTrialArena />
     </motion.div>

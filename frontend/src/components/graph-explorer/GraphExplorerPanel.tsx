@@ -12,7 +12,7 @@ export function GraphExplorerPanel() {
     >
       <header>
         <h2>Graph Explorer</h2>
-        <p className="panel-subtitle">Visualize and interact with your legal data.</p>
+        <p className="panel-subtitle text-text-secondary">Visualize and interact with your legal data.</p>
       </header>
       <GraphExplorer />
     </motion.div>

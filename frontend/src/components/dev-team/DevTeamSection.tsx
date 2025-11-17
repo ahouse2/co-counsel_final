@@ -7,6 +7,7 @@ import { ValidationResults } from './ValidationResults';
 import { ApprovalList } from './ApprovalList';
 import { MetricsDashboard } from './MetricsDashboard';
 import { GovernancePanel } from './GovernancePanel';
+import FeedbackForm from './FeedbackForm'; // Import the new FeedbackForm component
 
 function normaliseProposalValidation(proposal: DevAgentProposal | null): SandboxExecution | null {
   if (!proposal) {
@@ -126,6 +127,8 @@ export function DevTeamSection(): JSX.Element {
           />
         </div>
       </div>
+      <FeedbackForm /> {/* Add the FeedbackForm component here */}
     </div>
   );
 }
+

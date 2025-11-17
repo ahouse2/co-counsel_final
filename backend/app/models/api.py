@@ -13,6 +13,8 @@ class IngestionSource(BaseModel):
 
 
 class IngestionRequest(BaseModel):
+    document_id: Optional[str] = Field(default=None, description="Identifier for the document being ingested")
+    text: Optional[str] = Field(default=None, description="Raw text content to ingest")
     sources: List[IngestionSource]
 
 

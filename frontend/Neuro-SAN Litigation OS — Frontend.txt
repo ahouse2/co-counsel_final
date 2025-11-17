@@ -1,0 +1,350 @@
+Neuro-SAN Litigation OS — Frontend Specification (Rev. 11/17)
+
+A cinematic, immersive, halo-based interface for AI-driven legal discovery.
+
+1. Core Design Language
+1.1 Visual Style
+
+Overall aesthetic: Cinematic dark-mode, inspired by your reference image (Autoneum acoustic simulator).
+
+Palette:
+
+Background: charcoal/near-black gradient with subtle atmospheric noise.
+
+Highlights: neon electric blue, soft white glow, and optional green-gold accents for legal/evidence states.
+
+Motion:
+
+Smooth orbital UI animations, like rotating around a holographic sphere/halo.
+
+Modules illuminate when hovered—pulsing glow effect identical to your reference.
+
+Typography:
+
+All-caps headings with letter spacing (e.g., “SELECT A MODULE”).
+
+Slim, modern sans-serif body text (think Inter, Eurostile, or Exo).
+
+2. Halo Interaction Model (The Central Paradigm)
+
+The Halo is a circular UI element dominating the screen.
+It contains:
+
+Left Perimeter: Primary Modules (Nodes)
+
+Each module sits as a glowing orbital node on the left side of the halo.
+On hover: inner glow brightens + label fades in.
+On select: node connects to halo with a line and activates central viewport.
+
+Primary Modules:
+
+Graph Explorer
+
+Evidence Ingestion Pipeline
+
+AI Context Engine
+
+Legal Theory Team
+
+Forensics / Chain of Custody
+
+Timeline Builder
+
+Exhibit / Trial Binder Creator
+
+Mock Trial Arena
+
+Trial University
+
+Legal Research / Case Law Engine
+
+These must be arranged vertically but following the halo curvature.
+
+Right Perimeter: Submodules / Tools
+
+When a primary module is selected, the right perimeter populates with the context-appropriate submodules (each a smaller glowing node).
+
+Examples:
+
+Graph Explorer
+
+Vector Space View
+
+Structured Graph View
+
+Relationship Heatmap
+
+Autonomous Query Panel
+
+Agent Interaction Overlay
+
+Evidence Ingestion Pipeline
+
+Folder Upload
+
+OCR + Embedding
+
+Metadata Verification
+
+Fault Tolerance Logs
+
+File Hashing / Dedup
+
+Vector DB Sync
+
+Neo4j Sync
+
+Legal Theory Team
+
+Fact Pattern Extraction
+
+Legal Element Linking
+
+Context Generation
+
+Assertion / Counterassertion Engine
+
+Strategy Drafting
+
+Mock Trial Arena
+
+AI Critic Combat
+
+Witness Simulation
+
+Attack/Defense Passes
+
+Trial Scripts
+
+Legal Research
+
+Case Law Search
+
+Precedent Extraction
+
+Statutes & Codes
+
+CourtListener API Integration
+
+Knowledge Graph Sync
+
+3. Center Viewport (Inner Halo)
+
+This is the focus view.
+When a module or submodule is selected:
+
+The viewport gently animates in from a blurred holographic state.
+
+Provides a full-screen mini-app inside the circular boundary.
+
+Can zoom in/out depending on context:
+
+Chat viewer zooms into conversations.
+
+Graph explorer zooms out toward the stars.
+
+Upload pipeline zooms into a terminal-style UI.
+
+Viewport rules:
+
+Should never break the circular boundary.
+
+If content is rectangular (chat or documents), apply masked circular cropping or rounded vignette effect.
+
+4. Global UI Elements
+Top-Right: Menu Button
+
+Three-line “MENU” text-style button (same design as reference)
+
+Opens a slide-out panel with global navigation & user account settings.
+
+Bottom-Right: Settings Cog
+
+Opens provider/API configuration panel (LLMs, embeddings, OCR, courtlistener API key, storage options, etc.)
+
+Should match the glowing neon outline style.
+
+Bottom-Left: Contact / About / App Diagnostics
+
+Minimal understated text link area (“CONTACT US”, logs, diagnostics).
+
+5. Chat & Multi-Agent Visualization
+5.1 Global Chat Viewer
+
+A module that visualizes:
+
+Agent teams (Forensics, Legal Theory, Research, etc.)
+
+Their message exchanges
+
+Thread timelines
+
+Document references
+
+Interaction Patterns
+
+When user selects a team → viewport zooms into a micro-conversation room.
+
+Agents represented by:
+
+Floating avatars
+
+Orbs / nodes
+
+Or short vertical bars (like Discord voice channels)
+
+Modes
+
+Overview Mode: All teams interacting, flowing like a moving galaxy.
+
+Focus Mode: Drill into one team’s conversation (LLM to LLM).
+
+Thread View Mode: Chat messages line up as vertical stacked cards that fade in/out.
+
+6. Timeline Builder
+
+Core Requirements:
+
+Drag-and-drop timeline nodes
+
+Each node contains:
+
+Timestamp
+
+Factual summary
+
+Evidence citations
+
+“Open Document Viewer” button
+
+When clicked, documents slide in from right side within the halo as a circular-cropped viewer.
+
+7. Document Viewer (Pop-out within Halo)
+Requirements:
+
+PDF/Image/Text support
+
+Circular crop or rounded rectangular card masked inside halo
+
+Citation panel on right side
+
+Highlighted passages extracted by AI
+
+“Add to Timeline”, “Add to Theory”, “Add to Binder” buttons
+
+8. Trial Binder Creator
+
+A simplified, beautiful, dark-mode folder system that:
+
+Lets users designate exhibits
+
+Auto-generates exhibit cover sheets
+
+Organizes materials for presentation
+
+Exports in TrialPad/OnCue-compatible structures
+
+UI references:
+
+Folder tree on left
+
+Preview pane inside halo
+
+Exhibit card grid hovering in front of halo
+
+9. Technical Frontend Notes
+Framework Recommendation
+
+React + Three.js (for halo glow + orbital nodes)
+
+Or standard React with SVG layers + blur filters
+
+Animation Goals
+
+Smooth 60fps
+
+Glow bloom effects (CSS filter + optional WebGL bloom)
+
+GPU friendly
+
+Avoid clutter — maintain “black space” around halo
+
+Component Requirements
+
+NodeButton (primary modules)
+
+SubNodeButton
+
+HaloBoundary
+
+ViewportContainer
+
+GlowPulseEffect
+
+SlideOutMenu
+
+SettingsModal
+
+DocumentViewer
+
+AgentChatViewer
+
+TimelineEditor
+
+GraphCanvas
+
+10. UX Navigation Summary
+
+User Flow Example:
+
+User lands on Home → sees full halo with primary modules on left.
+
+Hover “Graph Explorer” → bright glow → user clicks.
+
+Right side populates with submodules.
+
+Center zooms into graph view.
+
+User selects “Autonomous Query Panel” → viewport animates into a console-style screen within the halo.
+
+User opens settings and adds API keys.
+
+User returns to “Evidence Ingestion” → uploads a folder → pipeline activity animates around halo border.
+
+User reviews citations → opens timeline → adds events → crosslinks to theory.
+
+User enters Mock Trial → agents argue → user watches conversation viewer.
+
+11. What the Next Mockup Should Include (for next PNG)
+
+To ensure your next generated PNG is perfect:
+
+Halo with left-side primary module nodes (glowing)
+
+Right-side submodule nodes (inactive until module selected)
+
+Central viewport placeholder
+
+Top-right menu
+
+Bottom-right settings cog
+
+Dark, moody, cinematic environment
+
+Variables for:
+
+Graph
+
+Chat viewer
+
+Timeline
+
+Document viewer
+
+Trial university
+
+Mock trial arena
+
+Pipeline
+
+You can tell me exactly which module you'd like rendered next, and I’ll generate another high-fidelity PNG mockup in that style.

@@ -33,7 +33,22 @@ async def ingest_text(
     principal: Principal = Depends(authorize_ingest_enqueue),
     service: IngestionService = Depends(get_ingestion_service),
 ) -> IngestionResponse:
+    if not request.document_id or not request.text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="document_id and text are required for text ingestion",
+        )
     return await service.ingest_text(principal, request.document_id, request.text)
+
+
+@router.post("/ingestion/upload_directory", response_model=IngestionResponse)
+async def upload_directory(
+    file: UploadFile = File(...),
+    document_id: str = Form(...),
+    principal: Principal = Depends(authorize_ingest_enqueue),
+    service: IngestionService = Depends(get_ingestion_service),
+) -> IngestionResponse:
+    return await service.ingest_directory(principal, document_id, file)
 
 
 @router.get("/ingestion/{document_id}/status", response_model=IngestionStatusResponse)

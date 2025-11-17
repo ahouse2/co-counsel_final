@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils'; // optional utility for class merging
+import { cn } from '@/lib/utils';
 
 type Props = {
   title: string;
@@ -7,15 +7,16 @@ type Props = {
   subtitle?: string;
   chart?: boolean;
   timeline?: boolean;
-  glow?: 'cyan' | 'pink' | 'violet' | 'blue';
+  glow?: 'cyan' | 'violet' | 'gold' | 'red' | 'green'; // Updated glow options
 };
 
 export function MetricCard({ title, value, subtitle, chart, timeline, glow }: Props) {
   const glowMap = {
-    cyan: 'shadow-[0_0_20px_#00ffff88]',
-    pink: 'shadow-[0_0_20px_#ff00ff88]',
-    violet: 'shadow-[0_0_20px_#a855f788]',
-    blue: 'shadow-[0_0_20px_#3b82f688]',
+    cyan: 'shadow-cyan-md', // Using CDS shadow utility
+    violet: 'shadow-violet-md', // Using CDS shadow utility
+    gold: 'shadow-neon-gold', // Using CDS shadow utility
+    red: 'shadow-[0_0_20px_var(--cds-color-accent-red)]', // Direct reference for specific glow
+    green: 'shadow-[0_0_20px_var(--cds-color-accent-green)]', // Direct reference for specific glow
   };
 
   return (
@@ -24,16 +25,18 @@ export function MetricCard({ title, value, subtitle, chart, timeline, glow }: Pr
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
       className={cn(
-        'bg-[#1a1a1f] rounded-xl p-4 backdrop-blur-md border border-[#2a2a2f]',
-        glowMap[glow || 'blue']
+        'cds-card-cinematic', // Use the predefined cinematic card style
+        glowMap[glow || 'cyan'] // Default to cyan glow
       )}
     >
-      <h2 className="text-lg font-medium">{title}</h2>
-      {value && <div className="text-4xl font-bold mt-2">{value}</div>}
-      {subtitle && <p className="text-sm text-gray-400">{subtitle}</p>}
-      {chart && <div className="mt-4 h-24 bg-gradient-to-r from-pink-500 to-purple-500 rounded" />}
+      <h2 className="text-lg font-medium text-text-primary">{title}</h2>
+      {value && <div className="text-4xl font-bold mt-2 text-text-primary">{value}</div>}
+      {subtitle && <p className="text-sm text-text-tertiary">{subtitle}</p>}
+      {chart && (
+        <div className="mt-4 h-24 bg-gradient-to-r from-accent-violet-500 to-accent-cyan-500 rounded" />
+      )}
       {timeline && (
-        <div className="mt-4 h-2 bg-gradient-to-r from-blue-500 via-violet-500 to-red-500 rounded-full" />
+        <div className="mt-4 h-2 bg-gradient-to-r from-accent-blue to-accent-violet-500 rounded-full" />
       )}
     </motion.div>
   );

@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { SettingsProvider } from './context/SettingsContext';
 import { QueryProvider } from './context/QueryContext';
@@ -36,17 +37,21 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
+const queryClient = new QueryClient();
+
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <SettingsProvider>
-      <QueryProvider>
-        <ScenarioProvider>
-          <DevTeamProvider>
-            <App />
-          </DevTeamProvider>
-        </ScenarioProvider>
-      </QueryProvider>
-    </SettingsProvider>
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <QueryProvider>
+          <ScenarioProvider>
+            <DevTeamProvider>
+              <App />
+            </DevTeamProvider>
+          </ScenarioProvider>
+        </QueryProvider>
+      </SettingsProvider>
+    </QueryClientProvider>
   </React.StrictMode>
 );
 

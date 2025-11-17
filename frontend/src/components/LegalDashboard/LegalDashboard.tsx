@@ -183,7 +183,7 @@ const LegalDashboard: React.FC = () => {
                     {predictiveOutcome?.probabilities && Object.entries(predictiveOutcome.probabilities).map(([outcome, prob]) => (
                       <div key={outcome} className="flex items-center gap-2">
                         <span className="w-24 text-gray-200 capitalize">{outcome}:</span>
-                        <Progress value={prob * 100} className="w-full h-3 bg-gray-700" indicatorColor={outcome === predictiveOutcome.predicted_outcome ? "bg-green-500" : "bg-blue-500"} />
+                        <Progress value={prob * 100} className="w-full h-3 bg-gray-700" />
                         <span className="w-10 text-right text-gray-200">{(prob * 100).toFixed(1)}%</span>
                       </div>
                     ))}

@@ -183,6 +183,26 @@ class LocalSourceConnector(BaseSourceConnector):
         return target
 
 
+class FileSourceConnector(BaseSourceConnector):
+    def preflight(self, source: IngestionSource) -> None:
+        self._resolve_file(source)
+
+    def materialize(self, job_id: str, index: int, source: IngestionSource) -> MaterializedSource:
+        file_path = self._resolve_file(source)
+        self.logger.info("Materialised file source", extra={"path": str(file_path)})
+        return MaterializedSource(root=file_path.parent, source=source, origin=str(file_path))
+
+    def _resolve_file(self, source: IngestionSource) -> Path:
+        if not source.path:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File source requires a path")
+        file_path = Path(source.path).expanduser().resolve()
+        if not file_path.exists():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"File path {file_path} not found")
+        if not file_path.is_file():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File source must reference a file")
+        return file_path
+
+
 class S3SourceConnector(BaseSourceConnector):
     def preflight(self, source: IngestionSource) -> None:
         self._ensure_boto3()
@@ -903,7 +923,7 @@ class OneDriveSourceConnector(BaseSourceConnector):
         )
 
 
-class WebSourceConnector(BaseSourceConnector):
+class WebSourceConnector:
 
 
     def preflight(self, source: IngestionSource) -> None:
