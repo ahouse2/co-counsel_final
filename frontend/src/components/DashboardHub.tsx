@@ -1,8 +1,11 @@
 
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import { cn } from '@/lib/utils';
+import { HaloContext } from '@/context/HaloContext';
+import { CaseContext } from '@/context/CaseContext';
 
 type Submodule = {
   id: string;
@@ -221,24 +224,38 @@ const ORBIT_NODES = Array.from({ length: 11 }).map((_, index) => ({
 }));
 
 export default function DashboardHub(): JSX.Element {
-  const [activeModuleId, setActiveModuleId] = useState(PRIMARY_MODULES[0].id);
-  const [activeSubmoduleId, setActiveSubmoduleId] = useState(PRIMARY_MODULES[0].submodules[0].id);
+  // Context-backed module state (if HaloContext is mounted) with local fallback
+  const haloCtx = React.useContext(HaloContext as any);
+  const caseCtx = React.useContext(CaseContext as any);
+  const [localActiveModuleId, setLocalActiveModuleId] = useState(PRIMARY_MODULES[0].id);
+  const [localActiveSubmoduleId, setLocalActiveSubmoduleId] = useState(PRIMARY_MODULES[0].submodules[0].id);
+  const effectiveActiveModuleId = haloCtx?.activeModuleId ?? localActiveModuleId;
+  const effectiveActiveSubmoduleId = haloCtx?.activeSubmoduleId ?? localActiveSubmoduleId;
+  const setActiveModuleIdWrapper = (id: string) => {
+    if (haloCtx?.setActiveModuleId) haloCtx.setActiveModuleId(id); else setLocalActiveModuleId(id);
+  };
+  const setActiveSubmoduleIdWrapper = (id: string) => {
+    if (haloCtx?.setActiveSubmoduleId) haloCtx.setActiveSubmoduleId(id); else setLocalActiveSubmoduleId(id);
+  };
 
   const activeModule = useMemo(
-    () => PRIMARY_MODULES.find((module) => module.id === activeModuleId) ?? PRIMARY_MODULES[0],
-    [activeModuleId]
+    () => PRIMARY_MODULES.find((module) => module.id === effectiveActiveModuleId) ?? PRIMARY_MODULES[0],
+    [effectiveActiveModuleId]
   );
-
+ 
   const activeSubmodule = useMemo(
     () =>
-      activeModule.submodules.find((submodule) => submodule.id === activeSubmoduleId) ??
+      activeModule.submodules.find((submodule) => submodule.id === effectiveActiveSubmoduleId) ??
       activeModule.submodules[0],
-    [activeModule, activeSubmoduleId]
+    [activeModule, effectiveActiveSubmoduleId]
   );
 
+
   useEffect(() => {
-    setActiveSubmoduleId(activeModule.submodules[0].id);
-  }, [activeModule.id]);
+    if (!haloCtx) {
+      setLocalActiveSubmoduleId(activeModule.submodules[0].id);
+    }
+  }, [activeModule.id, haloCtx]);
 
   return (
     <motion.section
@@ -259,7 +276,7 @@ export default function DashboardHub(): JSX.Element {
                   module.id === activeModule.id && 'active'
                 )}
                 style={{ '--node-index': index } as CSSProperties}
-                onClick={() => setActiveModuleId(module.id)}
+                onClick={() => setActiveModuleIdWrapper(module.id)}
               >
                 <span className="halo-node-dot" aria-hidden />
                 <div>
@@ -339,7 +356,7 @@ export default function DashboardHub(): JSX.Element {
                     'halo-subnode',
                     submodule.id === activeSubmodule.id && 'active'
                   )}
-                  onClick={() => setActiveSubmoduleId(submodule.id)}
+                  onClick={() => setActiveSubmoduleIdWrapper(submodule.id)}
                 >
                   <span className="halo-subnode-dot" aria-hidden />
                   <div>

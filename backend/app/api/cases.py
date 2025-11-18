@@ -19,3 +19,12 @@ async def get_cases(db: Session = Depends(get_db)):
     # For now, we will just get the distinct case_ids from the documents.
     cases = db.query(DocumentModel.case_id).distinct().all()
     return [{"id": case[0]} for case in cases]
+
+
+@router.get("/current", response_model=Case)
+async def get_current_case(db: Session = Depends(get_db)):
+    """Return a plausible current case for bootstrap."""
+    case = db.query(DocumentModel.case_id).distinct().first()
+    if not case or not case[0]:
+        return {"id": "default-case"}
+    return {"id": case[0]}

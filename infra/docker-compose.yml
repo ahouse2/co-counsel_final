@@ -87,84 +87,6 @@ services:
     networks:
       - backend
 
-  # stt:
-  #   <<: *gpu-capable
-  #   image: ghcr.io/etalab-ia/faster-whisper-server/cuda:latest
-  #   profiles:
-  #     - community
-  #     - pro
-  #     - enterprise
-  #     - gpu
-  #   environment:
-  #     - ASR_MODEL=${STT_MODEL_NAME:-openai/whisper-small}
-  #     - ASR_ENGINE=faster_whisper
-  #     - ASR_BEAM_SIZE=5
-  #     - ASR_DEVICE=${STT_DEVICE:-cpu}
-  #     - HUGGINGFACE_HUB_CACHE=/models/huggingface
-  #     - ASR_OUTPUT_LANGUAGE=${STT_OUTPUT_LANGUAGE:-en}
-  #   ports:
-  #     - "9000:9000"
-  #   volumes:
-  #     - ../var/models/huggingface:/models/huggingface
-  #     - ../var/models/whisper:/models/whisper
-  #   networks:
-  #     - backend
-
-  tts:
-    image: rhasspy/larynx:latest
-    runtime: runc
-    profiles:
-      - community
-      - pro
-      - enterprise
-    environment:
-      - LARYNX_VOICE=${TTS_VOICE:-en-us-blizzard_lessac}
-      - LARYNX_OUTPUT_DIR=/output
-      - HUGGINGFACE_HUB_CACHE=/models/huggingface
-    ports:
-      - "5002:5002"
-    volumes:
-      - ../var/models/huggingface:/models/huggingface
-      - ../var/models/tts:/models/tts
-      - ../var/audio:/output
-    networks:
-      - backend
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.98.0
-    profiles:
-      - pro
-      - enterprise
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
-    ports:
-      - "4317:4317"
-      - "9464:9464"
-    networks:
-      - backend
-
-  storage-backup:
-    image: ghcr.io/offen/docker-volume-backup:latest
-    profiles:
-      - community
-      - pro
-      - enterprise
-    environment:
-      - BACKUP_CRON=${BACKUP_CRON_SCHEDULE:-0 3 * * *}
-      - BACKUP_FILENAME=full-stack
-      - BACKUP_PATH=/var/backups
-      - BACKUP_PRUNING_PREFIX=full-stack
-      - BACKUP_PRUNING_KEEP_DAYS=${BACKUP_RETENTION_DAYS:-7}
-      - BACKUP_LATEST_SYMLINK=true
-    volumes:
-      - ../var/backups:/var/backups
-      - ../var/storage/documents:/backup/documents:ro
-      - ../var/storage/graphs:/backup/graphs:ro
-      - ../var/storage/telemetry:/backup/telemetry:ro
-    networks:
-      - backend
-
   frontend:
     build:
       context: ../frontend
@@ -177,6 +99,19 @@ services:
       - api
     networks:
       - backend
+
+  ci:
+    image: node:20-bullseye
+    container_name: opveritas-ci
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - backend
+    entrypoint: ["bash","-lc","set -e; apt-get update -y; apt-get install -y python3 python3-pip; pip3 install pytest; cd /workspace; npm ci; npm test; npm run prepare-e2e; npm run test:e2e; pytest -q backend/tests"]}
 
 volumes:
   neo4j_data:

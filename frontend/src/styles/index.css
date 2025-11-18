@@ -1361,9 +1361,10 @@ body::before {
 
 .halo-interface {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(420px, 1fr) minmax(280px, 360px);
+  grid-template-columns: 260px minmax(420px, 1fr) 360px;
   gap: clamp(1.5rem, 3vw, 3rem);
   align-items: stretch;
+  overflow: hidden;
 }
 
 .halo-column {
@@ -1443,22 +1444,23 @@ body::before {
   inset: 0;
 }
 
-.halo-core {
-  position: absolute;
-  inset: 15%;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 214, 255, 0.25);
-  box-shadow: inset 0 0 60px rgba(0, 214, 255, 0.2);
-}
+  .halo-core {
+    position: absolute;
+    inset: 15%;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 214, 255, 0.25);
+    box-shadow: inset 0 0 60px rgba(0, 214, 255, 0.2);
+    overflow: hidden;
+  }
 
-.halo-viewport-info {
-  position: absolute;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  width: 70%;
-}
+  .halo-viewport-info {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    width: 60%;
+  }
 
 .halo-status-chip {
   display: inline-flex;

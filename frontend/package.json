@@ -10,7 +10,9 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "validate:sim": "node scripts/validate-sim-assets.mjs"
+    "validate:sim": "node scripts/validate-sim-assets.mjs",
+    "test:e2e": "playwright test",
+    "prepare-e2e": "npx playwright install"
   },
   "dependencies": {
     "@annotorious/annotorious": "3.7.14-beta",
