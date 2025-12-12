@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "user-prompt-submit": [
+      {
+        "matcher": "",
+        "hooks": [
+          "i:\\projects\\op_veritas_2\\.claude\\hooks\\user-prompt-submit.sh"
+        ]
+      }
+    ],
+    "stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          "i:\\projects\\op_veritas_2\\.claude\\hooks\\stop.sh"
+        ]
+      }
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Terminal, Cpu, Network } from 'lucide-react';
+import { Activity, Terminal, Cpu, Network, Tag, GitBranch, FileText, Calendar, Zap } from 'lucide-react';
 
 interface Agent {
     id: string;
@@ -7,10 +7,19 @@ interface Agent {
     role: string;
     status: 'idle' | 'thinking' | 'executing' | 'error';
     currentTask?: string;
+    icon?: React.ReactNode;
 }
 
+// Define the core Ingestion Swarm agents
+const INGESTION_SWARM_AGENTS: Agent[] = [
+    { id: 'tagger', name: 'TaggerAgent', role: 'Auto-Tagging', status: 'idle', icon: <Tag size={20} /> },
+    { id: 'relation_miner', name: 'RelationMinerAgent', role: 'Graph Discovery', status: 'idle', icon: <GitBranch size={20} /> },
+    { id: 'summarizer', name: 'SummarizerAgent', role: 'Summarization', status: 'idle', icon: <FileText size={20} /> },
+    { id: 'timeline', name: 'TimelineAgent', role: 'Event Extraction', status: 'idle', icon: <Calendar size={20} /> },
+];
+
 export function AgentConsoleModule() {
-    const [agents, setAgents] = useState<Agent[]>([]);
+    const [agents, setAgents] = useState<Agent[]>(INGESTION_SWARM_AGENTS);
     const [logs, setLogs] = useState<string[]>([]);
 
     useEffect(() => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { endpoints } from '../../services/api';
 import { format } from 'date-fns';
-import { Calendar, Search, ZoomIn, ZoomOut, RefreshCw, ChevronRight } from 'lucide-react';
+import { Calendar, Search, ZoomIn, ZoomOut, RefreshCw, ChevronRight, Download } from 'lucide-react';
 import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { motion } from 'framer-motion';
 
@@ -75,6 +75,28 @@ export function TimelineModule() {
         console.log(`Zooming ${direction}`);
     };
 
+    const exportToCSV = () => {
+        if (events.length === 0) return;
+
+        const headers = ['Date', 'Title', 'Description', 'Type', 'Significance'];
+        const csvContent = [
+            headers.join(','),
+            ...events.map(e => [
+                format(new Date(e.date), 'yyyy-MM-dd'),
+                `"${e.title.replace(/"/g, '""')}"`,
+                `"${e.description.replace(/"/g, '""')}"`,
+                e.type,
+                e.significance
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `timeline_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        link.click();
+    };
+
     const chartData = events.map(e => ({
         ...e,
         x: new Date(e.date).getTime(),
@@ -122,8 +144,16 @@ export function TimelineModule() {
                             className="bg-black/40 border border-halo-border rounded-lg pl-9 pr-4 py-2 text-sm focus:border-halo-cyan focus:outline-none w-64"
                         />
                     </div>
-                    <button onClick={fetchTimeline} className="p-2 bg-halo-card border border-halo-border rounded hover:bg-halo-cyan/10 hover:border-halo-cyan transition-colors">
+                    <button onClick={fetchTimeline} className="p-2 bg-halo-card border border-halo-border rounded hover:bg-halo-cyan/10 hover:border-halo-cyan transition-colors" title="Refresh">
                         <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                    </button>
+                    <button
+                        onClick={exportToCSV}
+                        disabled={events.length === 0}
+                        className="p-2 bg-halo-card border border-halo-border rounded hover:bg-halo-cyan/10 hover:border-halo-cyan transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Export to CSV"
+                    >
+                        <Download size={20} />
                     </button>
                 </div>
             </div>
