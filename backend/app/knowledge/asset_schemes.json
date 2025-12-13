@@ -1,0 +1,106 @@
+[
+    {
+        "id": "scheme_offshore_shell",
+        "name": "Offshore Shell Company",
+        "description": "Use of a non-operational entity in a low-tax or high-secrecy jurisdiction to hold assets or launder funds.",
+        "indicators": [
+            "Payments to entities in known tax havens (Cayman Islands, BVI, Panama, Seychelles, Switzerland)",
+            "Vendor address matches a 'Registered Agent' or 'Mass Registration' address (e.g., PO Box 123, Ugland House)",
+            "Invoices for vague services like 'Consulting', 'Management Fees', or 'Software Licensing' with round numbers",
+            "Entity has no web presence, LinkedIn employees, or physical footprint",
+            "Sudden large transfers to a previously unknown entity just before litigation"
+        ],
+        "detection_methods": [
+            "Cross-reference addresses with 'Offshore Leaks' database or known registered agent addresses",
+            "Analyze swift codes for correspondent banking trails",
+            "Request 'Beneficial Ownership' (UBO) declarations"
+        ],
+        "counter_measures": [
+            "File 28 U.S.C. § 1782 discovery request for foreign evidence",
+            "Subpoena US correspondent banks for wire details",
+            "Request court order for 'Letter Rogatory'"
+        ]
+    },
+    {
+        "id": "scheme_hidden_trust",
+        "name": "Undisclosed Domestic/Foreign Trust",
+        "description": "Transferring ownership of assets to a trust to remove them from the individual's legal name while retaining control.",
+        "indicators": [
+            "Regular payments labeled 'Trust Distribution' or 'Trustee Fees'",
+            "Property deeds showing transfer to a Trust entity for $1 or 'Love and Affection'",
+            "Checks written to 'The [Name] Family Trust'",
+            "Sudden removal of assets from personal financial statements",
+            "Continued use of an asset (e.g., vacation home) after alleged transfer"
+        ],
+        "detection_methods": [
+            "Search county land records for Grantor/Grantee index matches",
+            "Review tax returns (Schedule B, Form 3520) for foreign trust reporting",
+            "Analyze bank statements for recurring payments to trust entities"
+        ],
+        "counter_measures": [
+            "Motion to compel production of Trust Instrument",
+            "Depose the Trustee regarding 'Sham Trust' or 'Alter Ego' theory",
+            "Petition to pierce the trust veil if self-settled"
+        ]
+    },
+    {
+        "id": "scheme_nominee",
+        "name": "Nominee / Straw Man Ownership",
+        "description": "Placing assets in the name of a friend, relative, or employee to hide true beneficial ownership.",
+        "indicators": [
+            "Asset held by a person with insufficient income to afford it (e.g., student, elderly relative)",
+            "Subject continues to pay maintenance, insurance, or taxes for the asset",
+            "Subject holds 'Power of Attorney' over the nominee's accounts",
+            "Nominee has no involvement in the management of the business asset"
+        ],
+        "detection_methods": [
+            "Lifestyle analysis of the nominee vs. asset value",
+            "Search for 'Side Letters' or 'Deed of Trust' documents",
+            "Trace source of funds for the initial purchase"
+        ],
+        "counter_measures": [
+            "Depose the nominee regarding source of funds",
+            "Forensic tracing of the purchase money trail"
+        ]
+    },
+    {
+        "id": "scheme_lifestyle_discrepancy",
+        "name": "Lifestyle vs. Reported Income Discrepancy",
+        "description": "Spending significantly more than reported income, suggesting unreported cash or hidden accounts.",
+        "indicators": [
+            "Credit card bills exceeding total reported net income",
+            "Cash purchases of luxury items (cars, jewelry, art) not reflected in bank withdrawals",
+            "Mortgage payments or rent far exceeding 30-40% of reported income",
+            "No withdrawals for daily living expenses (groceries, gas) - implies cash hoard"
+        ],
+        "detection_methods": [
+            "Perform 'Source and Application of Funds' analysis",
+            "Calculate 'Net Worth Method' (Assets - Liabilities = Net Worth; Change in NW + Living Expenses = Income)",
+            "Review credit card statements for luxury travel/goods"
+        ],
+        "counter_measures": [
+            "Request detailed 'Lifestyle Questionnaire' in discovery",
+            "Subpoena credit card issuers for full transaction history"
+        ]
+    },
+    {
+        "id": "scheme_crypto_obfuscation",
+        "name": "Cryptocurrency Layering",
+        "description": "Using crypto to move funds out of the banking system and into anonymous wallets.",
+        "indicators": [
+            "Transfers to known crypto exchanges (Coinbase, Binance, Kraken)",
+            "Large round-dollar transfers to 'Unknown' entities",
+            "Purchase of 'Mining Equipment' or 'Server Hosting'",
+            "Keywords: 'Wallet', 'Seed', 'Key', 'Ledger', 'Trezor', 'Metamask'"
+        ],
+        "detection_methods": [
+            "Trace funds to exchange deposit addresses",
+            "Search email/cloud for wallet backup phrases or exchange confirmations",
+            "Blockchain analytics (as implemented in CryptoService)"
+        ],
+        "counter_measures": [
+            "Subpoena the exchange for KYC and transaction history",
+            "Forensic imaging of devices to find wallet keys"
+        ]
+    }
+]
