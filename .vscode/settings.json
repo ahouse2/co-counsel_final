@@ -1,0 +1,13 @@
+{
+    "css.lint.unknownAtRules": "ignore",
+    "css.validate": false,
+    "scss.validate": false,
+    "less.validate": false,
+    "stylelint.enable": false,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.stylelint": "never"
+    },
+    "files.associations": {
+        "*.css": "tailwindcss"
+    }
+}
