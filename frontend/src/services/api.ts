@@ -126,6 +126,16 @@ export const endpoints = {
     context: {
         query: (query: string, caseId: string) => api.post('/api/context/query', { query, case_id: caseId }),
     },
+    // Knowledge Graph
+    knowledgeGraph: {
+        causeSupportScores: () => api.get('/api/knowledge-graph/cause-support-scores'),
+        causeSubgraph: (cause: string) => api.get(`/api/knowledge-graph/cause-subgraph/${cause}`),
+        subgraph: (label: string) => api.get(`/api/knowledge-graph/subgraph/${label}`),
+        searchLegal: (query: string) => api.get(`/api/knowledge-graph/legal-references/search?query=${encodeURIComponent(query)}`),
+        node: (nodeId: number) => api.get(`/api/knowledge-graph/node/${nodeId}`),
+        nodeRelationships: (nodeId: number) => api.get(`/api/knowledge-graph/node/${nodeId}/relationships`),
+    },
+
     // Halo
     halo: {
         bootstrap: () => api.get('/api/halo/bootstrap'),

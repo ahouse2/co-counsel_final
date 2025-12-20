@@ -146,6 +146,23 @@ export function LegalTheoryModule() {
         }
     };
 
+    // Cause Support Scores (KG) State
+    const [causeSupportScores, setCauseSupportScores] = useState<any[] | null>(null);
+    const [loadingCauseScores, setLoadingCauseScores] = useState(false);
+
+    const handleFetchCauseScores = async () => {
+        setLoadingCauseScores(true);
+        try {
+            const res = await endpoints.knowledgeGraph.causeSupportScores();
+            setCauseSupportScores(res.data);
+        } catch (e) {
+            console.error("Failed to fetch cause support scores:", e);
+        } finally {
+            setLoadingCauseScores(false);
+        }
+    };
+
+
     // Submodule Views
     if (activeSubmodule === 'strategy') {
         return (
@@ -325,7 +342,94 @@ export function LegalTheoryModule() {
         );
     }
 
+    // Cause Strength (KG Support Scores) View
+    if (activeSubmodule === 'cause_strength') {
+        return (
+            <div className="w-full h-full flex flex-col p-8 text-halo-text overflow-hidden">
+                <div className="flex items-center justify-between mb-6 shrink-0">
+                    <div className="flex items-center gap-3 text-halo-cyan">
+                        <Scale size={24} />
+                        <h3 className="text-lg font-mono uppercase tracking-wide">Cause Support Strength</h3>
+                    </div>
+                    <button
+                        onClick={handleFetchCauseScores}
+                        disabled={loadingCauseScores}
+                        className="flex items-center gap-2 px-4 py-2 bg-halo-cyan/10 hover:bg-halo-cyan/20 text-halo-cyan border border-halo-cyan/30 rounded transition-all disabled:opacity-50 text-sm uppercase tracking-wider"
+                    >
+                        {loadingCauseScores ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                        {loadingCauseScores ? 'Loading...' : 'Refresh Scores'}
+                    </button>
+                </div>
+                <div className="flex-1 bg-black/30 rounded-lg p-6 border border-halo-border overflow-y-auto custom-scrollbar">
+                    {loadingCauseScores && (
+                        <div className="flex flex-col items-center justify-center h-full text-halo-cyan">
+                            <Loader2 size={32} className="animate-spin mb-4" />
+                            <span className="text-xs font-mono">QUERYING KNOWLEDGE GRAPH...</span>
+                        </div>
+                    )}
+                    {!loadingCauseScores && causeSupportScores && causeSupportScores.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-4">
+                            {causeSupportScores.map((cause: any, i: number) => (
+                                <div key={i} className="p-4 bg-halo-card border border-halo-border rounded-lg hover:border-halo-cyan transition-colors">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <h4 className="font-bold text-halo-cyan text-sm">{cause.cause || cause.name || `Cause ${i + 1}`}</h4>
+                                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${(cause.confidence || cause.score || 0) > 0.7 ? 'bg-green-500/20 text-green-400' :
+                                                (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    'bg-red-500/20 text-red-400'
+                                            }`}>
+                                            {Math.round((cause.confidence || cause.score || 0) * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2 text-xs">
+                                        {cause.satisfied_count !== undefined && (
+                                            <div className="flex justify-between">
+                                                <span className="text-halo-muted">Satisfied Elements:</span>
+                                                <span className="text-green-400">{cause.satisfied_count}</span>
+                                            </div>
+                                        )}
+                                        {cause.total_elements !== undefined && (
+                                            <div className="flex justify-between">
+                                                <span className="text-halo-muted">Total Elements:</span>
+                                                <span className="text-halo-text">{cause.total_elements}</span>
+                                            </div>
+                                        )}
+                                        {cause.unsatisfied_elements && cause.unsatisfied_elements.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t border-halo-border">
+                                                <span className="text-red-400 block mb-1">Missing:</span>
+                                                {cause.unsatisfied_elements.map((el: string, j: number) => (
+                                                    <span key={j} className="inline-block mr-1 mb-1 px-2 py-0.5 bg-red-500/10 text-red-300 rounded text-xs">
+                                                        {el}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Progress bar */}
+                                    <div className="mt-3 h-2 bg-black/50 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full transition-all ${(cause.confidence || cause.score || 0) > 0.7 ? 'bg-green-500' :
+                                                    (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500' :
+                                                        'bg-red-500'
+                                                }`}
+                                            style={{ width: `${(cause.confidence || cause.score || 0) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : !loadingCauseScores ? (
+                        <div className="h-full flex flex-col items-center justify-center text-halo-muted opacity-50">
+                            <Scale size={48} className="mb-4" />
+                            <p className="text-center max-w-xs">Fetch cause support scores from the Knowledge Graph to see evidence strength per cause of action.</p>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        );
+    }
+
     // Default / Facts View
+
     return (
         <div className="w-full h-full flex flex-col p-8 text-halo-text overflow-hidden">
             {/* Header & Controls */}

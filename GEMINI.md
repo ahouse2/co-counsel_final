@@ -287,3 +287,12 @@ Timeline & JurySentiment KG Integration
 - Updated `frontend/src/services/api.ts` with new endpoints: `timeline.sync()` and `jurySentiment.getParties()`
 - Pushed all changes to GitHub main branch
 
+/newline
+@2025/12/20 03:40:00 AM
+DevilsAdvocate Evidence Graph Integration
+- Added `get_evidence_graph` method to `DevilsAdvocateService` for querying KG for causes and evidence
+- Created `GET /devils-advocate/{case_id}/evidence_graph` API endpoint
+- Added `evidenceGraph` method to frontend `api.ts`
+- Added "Evidence Graph" tab to `DevilsAdvocateModule.tsx` with KG-sourced visualization
+- Shows causes of action, supporting evidence with strength scores, and contradiction warnings
+- Pushed all changes to GitHub main branch
