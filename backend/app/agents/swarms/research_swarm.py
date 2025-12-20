@@ -253,16 +253,96 @@ Generate a concise legal research query (one sentence):"""
             return f"Legal research for {metadata.get('doc_type', 'document')}"
     
     async def _add_to_knowledge_graph(self, results: Dict[str, Any], case_id: str):
-        """Add research findings to the knowledge graph"""
+        """
+        Add research findings to the knowledge graph.
+        Creates ResearchFinding nodes and links them to the case and source documents.
+        """
+        from uuid import uuid4
+        
+        if not self.kg_service:
+            logger.warning("No KG service available - skipping research graph update")
+            return
+        
+        findings_added = 0
+        
         try:
-            # Create nodes for each research finding
             for agent_result in results.get("agent_results", []):
-                if agent_result.get("status") == "success":
-                    for finding in agent_result.get("results", []):
-                        # Add as a node linked to the case
-                        logger.debug(f"Would add to graph: {finding}")
+                if agent_result.get("status") != "success":
+                    continue
+                    
+                agent_name = agent_result.get("agent", "unknown")
+                
+                for finding in agent_result.get("results", []):
+                    try:
+                        # Generate unique ID for this finding
+                        finding_id = f"research_{case_id}_{uuid4().hex[:8]}"
+                        
+                        # Extract finding properties
+                        props = {
+                            "id": finding_id,
+                            "case_id": case_id,
+                            "source_agent": agent_name,
+                            "title": finding.get("name") or finding.get("title") or finding.get("case_name", ""),
+                            "citation": finding.get("citation", ""),
+                            "summary": str(finding.get("summary") or finding.get("excerpt", ""))[:1000],
+                            "url": finding.get("url") or finding.get("absolute_url", ""),
+                            "relevance_score": float(finding.get("relevance", finding.get("similarity_score", 0.5))),
+                            "finding_type": self._classify_finding_type(finding, agent_name),
+                            "jurisdiction": finding.get("jurisdiction", finding.get("court", "")),
+                            "date_found": finding.get("date_filed", finding.get("date", "")),
+                        }
+                        
+                        # Add entity to knowledge graph
+                        await self.kg_service.add_entity("ResearchFinding", props)
+                        
+                        # Link finding to case (create case node if needed)
+                        case_props = {"id": f"case_{case_id}", "case_id": case_id}
+                        await self.kg_service.add_entity("Case", case_props)
+                        
+                        await self.kg_service.add_relationship(
+                            from_entity_id=f"case_{case_id}",
+                            from_entity_type="Case",
+                            to_entity_id=finding_id,
+                            to_entity_type="ResearchFinding",
+                            relationship_type="HAS_RESEARCH",
+                            properties={"discovered_by": agent_name}
+                        )
+                        
+                        # Link to source document if available
+                        doc_id = results.get("doc_id")
+                        if doc_id:
+                            await self.kg_service.add_relationship(
+                                from_entity_id=doc_id,
+                                from_entity_type="Document",
+                                to_entity_id=finding_id,
+                                to_entity_type="ResearchFinding",
+                                relationship_type="TRIGGERED_RESEARCH",
+                                properties={}
+                            )
+                        
+                        findings_added += 1
+                        logger.debug(f"Added research finding to graph: {finding_id}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to add single finding to graph: {e}")
+                        continue
+            
+            logger.info(f"ResearchSwarm added {findings_added} findings to knowledge graph for case {case_id}")
+            
         except Exception as e:
-            logger.error(f"Failed to add research to graph: {e}")
+            logger.error(f"Failed to add research to graph: {e}", exc_info=True)
+    
+    def _classify_finding_type(self, finding: Dict[str, Any], agent_name: str) -> str:
+        """Classify the type of research finding based on source and content."""
+        if "courtlistener" in agent_name.lower():
+            return "case_law"
+        elif "california" in agent_name.lower():
+            return "state_statute"
+        elif "federal" in agent_name.lower():
+            return "federal_code"
+        elif finding.get("type"):
+            return finding["type"]
+        return "legal_reference"
 
 
 # Factory function
@@ -273,3 +353,4 @@ def get_research_swarm() -> ResearchSwarm:
     if _research_swarm is None:
         _research_swarm = ResearchSwarm()
     return _research_swarm
+
