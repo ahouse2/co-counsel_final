@@ -305,3 +305,14 @@ KnowledgeGraph API & LegalTheory Cause Strength
 - Displays KG-sourced cause-of-action support scores with visual progress bars
 - Shows satisfied/total elements and missing elements per cause
 - Pushed all changes to GitHub main branch
+
+/newline
+@2025/12/20 06:50:00 AM
+CRITICAL: Complete Autonomous Intelligence Loop
+- Fixed `ResearchSwarm._add_to_knowledge_graph()` which was a STUB (only logged, didn't persist)
+- Now creates `ResearchFinding` nodes with full properties (title, citation, summary, url, relevance_score)
+- Links findings to `Case` nodes via `HAS_RESEARCH` relationship
+- Links findings to source `Document` nodes via `TRIGGERED_RESEARCH` relationship
+- Added `_classify_finding_type()` helper (case_law, state_statute, federal_code)
+- Autonomous loop now complete: Ingestion → Entity Extraction → Research → KG → Services → Insights
+- Pushed all changes to GitHub main branch
