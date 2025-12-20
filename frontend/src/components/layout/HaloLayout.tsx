@@ -114,6 +114,10 @@ const SUBMODULES: Record<ModuleId, { id: string; label: string }[]> = {
         { id: 'challenge', label: 'Challenge Theory' },
         { id: 'analysis', label: 'Weakness Analysis' },
     ],
+    jury: [
+        { id: 'analysis', label: 'Sentiment Analysis' },
+        { id: 'simulation', label: 'Jury Simulation' },
+    ],
 };
 
 export function HaloLayout({ children }: { children: React.ReactNode }) {
