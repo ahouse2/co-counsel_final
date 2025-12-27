@@ -1,5 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import func as sqla_func
 from backend.app.models.case import Case
 from backend.app.models.document import Document
 import uuid
@@ -13,9 +14,33 @@ class CaseService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _generate_case_number(self) -> str:
+        """Generate a human-readable case number in format CC-{year}-{sequence}."""
+        year = datetime.now().year
+        prefix = f"CC-{year}-"
+        
+        # Find the highest existing case number for this year
+        existing = self.db.query(Case).filter(
+            Case.case_number.like(f"{prefix}%")
+        ).order_by(Case.case_number.desc()).first()
+        
+        if existing and existing.case_number:
+            try:
+                # Extract sequence number from existing case_number
+                seq = int(existing.case_number.split("-")[-1])
+                new_seq = seq + 1
+            except (ValueError, IndexError):
+                new_seq = 1
+        else:
+            new_seq = 1
+        
+        return f"{prefix}{new_seq:03d}"
+
     def create_case(self, name: str, description: Optional[str] = None) -> Case:
+        case_number = self._generate_case_number()
         case = Case(
             id=str(uuid.uuid4()),
+            case_number=case_number,
             name=name,
             description=description,
             status="active"

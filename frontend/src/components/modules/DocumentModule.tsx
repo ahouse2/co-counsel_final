@@ -166,6 +166,14 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
 
     // Upload function for chunked uploads
     const uploadChunkFn = async (files: File[], paths: string[], chunkIndex: number, totalChunks: number, onProgress?: (progress: number) => void) => {
+        // Validate caseId is present
+        if (!caseId) {
+            console.error('[UPLOAD] No caseId provided! Cannot upload.');
+            throw new Error('No case selected. Please select or create a case before uploading documents.');
+        }
+
+        console.log(`[UPLOAD] Uploading chunk ${chunkIndex + 1}/${totalChunks} with ${files.length} files to case: ${caseId}`);
+
         const formData = new FormData();
         files.forEach((file, idx) => {
             formData.append('files', file, paths[idx]);
@@ -173,11 +181,14 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
         formData.append('chunk_index', chunkIndex.toString());
         formData.append('total_chunks', totalChunks.toString());
 
-        return await endpoints.documents.uploadChunk(caseId, formData, (progressEvent) => {
+        const response = await endpoints.documents.uploadChunk(caseId, formData, (progressEvent) => {
             if (onProgress && progressEvent.total) {
                 onProgress(progressEvent.loaded / progressEvent.total);
             }
         });
+
+        console.log(`[UPLOAD] Chunk ${chunkIndex + 1}/${totalChunks} uploaded successfully:`, response.data);
+        return response;
     };
 
     const uploadManager = useUploadManager(uploadChunkFn);
@@ -398,9 +409,16 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
         const files = event.target.files;
         if (!files || files.length === 0) return;
 
+        // Validate case is selected
+        if (!caseId) {
+            addLog(`[ERROR] No case selected! Please select or create a case first.`);
+            alert('No case selected. Please select or create a case before uploading documents.');
+            return;
+        }
+
         setUploading(true);
         setActiveSubmodule('logs'); // Switch to logs view to show progress
-        addLog(`[SYSTEM] Starting upload of ${files.length} files...`);
+        addLog(`[SYSTEM] Starting upload of ${files.length} files to case ${caseId}...`);
 
         try {
             // Check if this is a folder upload (multiple files from directory input)
@@ -925,7 +943,7 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
                                         )
                                     ) : activeTab === 'graph' ? (
                                         <div className="w-full h-full bg-black/20 rounded border border-halo-border overflow-hidden">
-                                            <DocumentGraph docId={selectedDoc.id} caseId="default_case" />
+                                            <DocumentGraph docId={selectedDoc.id} caseId={caseId} />
                                         </div>
                                     ) : activeTab === 'entities' ? (
                                         <EntitiesView docId={selectedDoc.id} />

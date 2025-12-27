@@ -19,6 +19,7 @@ class CaseUpdate(BaseModel):
 
 class CaseResponse(BaseModel):
     id: str
+    case_number: Optional[str] = None
     name: str
     description: Optional[str] = None
     status: str
@@ -30,14 +31,14 @@ class CaseResponse(BaseModel):
 def get_case_service(db: Session = Depends(get_db)) -> CaseService:
     return CaseService(db)
 
-@router.post("/cases", response_model=CaseResponse)
+@router.post("", response_model=CaseResponse)
 async def create_case(
     case: CaseCreate,
     service: CaseService = Depends(get_case_service)
 ):
     return service.create_case(case.name, case.description)
 
-@router.get("/cases", response_model=List[CaseResponse])
+@router.get("", response_model=List[CaseResponse])
 async def list_cases(
     service: CaseService = Depends(get_case_service)
 ):
@@ -46,6 +47,7 @@ async def list_cases(
     return [
         CaseResponse(
             id=c.id,
+            case_number=c.case_number,
             name=c.name,
             description=c.description,
             status=c.status,
@@ -53,7 +55,7 @@ async def list_cases(
         ) for c in cases
     ]
 
-@router.get("/cases/{case_id}", response_model=CaseResponse)
+@router.get("/{case_id}", response_model=CaseResponse)
 async def get_case(
     case_id: str,
     service: CaseService = Depends(get_case_service)
@@ -63,13 +65,14 @@ async def get_case(
         raise HTTPException(status_code=404, detail="Case not found")
     return CaseResponse(
         id=case.id,
+        case_number=case.case_number,
         name=case.name,
         description=case.description,
         status=case.status,
         created_at=case.created_at.isoformat() if case.created_at else None
     )
 
-@router.put("/cases/{case_id}", response_model=CaseResponse)
+@router.put("/{case_id}", response_model=CaseResponse)
 async def update_case(
     case_id: str,
     case_update: CaseUpdate,
@@ -80,13 +83,14 @@ async def update_case(
         raise HTTPException(status_code=404, detail="Case not found")
     return CaseResponse(
         id=case.id,
+        case_number=case.case_number,
         name=case.name,
         description=case.description,
         status=case.status,
         created_at=case.created_at.isoformat() if case.created_at else None
     )
 
-@router.delete("/cases/{case_id}")
+@router.delete("/{case_id}")
 async def delete_case(
     case_id: str,
     service: CaseService = Depends(get_case_service)
@@ -96,7 +100,7 @@ async def delete_case(
         raise HTTPException(status_code=404, detail="Case not found")
     return {"message": "Case deleted successfully"}
 
-@router.get("/cases/{case_id}/export")
+@router.get("/{case_id}/export")
 async def export_case(
     case_id: str,
     service: CaseService = Depends(get_case_service)
@@ -111,7 +115,7 @@ async def export_case(
         headers={"Content-Disposition": f"attachment; filename=case_{case_id}_export.zip"}
     )
 
-@router.post("/cases/import", response_model=CaseResponse)
+@router.post("/import", response_model=CaseResponse)
 async def import_case(
     file: UploadFile = File(...),
     service: CaseService = Depends(get_case_service)
@@ -124,6 +128,7 @@ async def import_case(
         case = service.import_case(content)
         return CaseResponse(
             id=case.id,
+            case_number=case.case_number,
             name=case.name,
             description=case.description,
             status=case.status,
@@ -150,6 +155,7 @@ async def get_current_case(service: CaseService = Depends(get_case_service)):
     c = cases[0]
     return CaseResponse(
         id=c.id,
+        case_number=c.case_number,
         name=c.name,
         description=c.description,
         status=c.status,

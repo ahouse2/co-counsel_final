@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 // @ts-ignore
-import { ForceGraph2D } from 'react-force-graph';
+import ForceGraph2D from 'react-force-graph-2d';
 // @ts-ignore
 import { Sankey, Tooltip, ResponsiveContainer } from 'recharts';
 import { Search, DollarSign, AlertTriangle, Wallet, Globe, Briefcase, FileText, ExternalLink, ArrowRight, Activity } from 'lucide-react';

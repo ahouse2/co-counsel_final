@@ -20,6 +20,9 @@ import { NarrativeModule } from './modules/NarrativeModule';
 import { DevilsAdvocateModule } from './modules/DevilsAdvocateModule';
 import { DashboardModule } from './modules/DashboardModule';
 import { JurySentimentModule } from './modules/JurySentimentModule';
+import { InterviewModule } from './modules/InterviewModule';
+import { ChatModule } from './modules/ChatModule';
+import { AssetHunterModule } from './modules/AssetHunterModule';
 import { CommandPalette } from './ui/CommandPalette';
 
 export function DashboardHub() {
@@ -29,6 +32,10 @@ export function DashboardHub() {
         switch (activeModule) {
             case 'graph':
                 return null;
+            case 'dashboard':
+                return <DashboardModule />;
+            case 'interview':
+                return <InterviewModule />;
             case 'theory':
                 return <LegalTheoryModule />;
             case 'forensics':
@@ -63,6 +70,10 @@ export function DashboardHub() {
                 return <DevilsAdvocateModule caseId={caseId} isActive={activeModule === 'devils_advocate'} />;
             case 'jury':
                 return <JurySentimentModule caseId={caseId} />;
+            case 'chat':
+                return <ChatModule />;
+            case 'assethunter':
+                return <AssetHunterModule />;
             default:
                 return <DashboardModule />;
         }

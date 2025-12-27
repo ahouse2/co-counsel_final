@@ -26,6 +26,12 @@ class LLMService:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.real_service.generate_text, prompt)
 
+    def complete(self, prompt: str, **kwargs) -> str:
+        """
+        Synchronous completion method for agents that expect this interface.
+        """
+        return self.real_service.generate_text(prompt)
+
 _llm_service: Optional[LLMService] = None
 
 def get_llm_service() -> LLMService:

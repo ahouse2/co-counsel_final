@@ -37,7 +37,10 @@ class ClassificationService:
         # For now, let's re-use the logic from `create_extractors` in `llama_index_factory` 
         # to get a proper LlamaIndex LLM instance.
         
-        self.llm = self._get_llama_index_llm(settings.llm)
+        # Build LLM config from settings using ingestion factory
+        from backend.ingestion.settings import build_llm_config
+        llm_config = build_llm_config(settings)
+        self.llm = self._get_llama_index_llm(llm_config)
         
         # Define our categories as "Tools" for the selector
         # This is how LlamaIndex selectors work - they select from a list of choices.
@@ -52,14 +55,14 @@ class ClassificationService:
             ToolMetadata(description="Other legal document not fitting the above categories.", name="Other"),
         ]
         
-        self.selector = LLMMultiSelector.from_defaults(llm=self.llm)
+        self.selector = LLMMultiSelector.from_defaults(llm=self.llm) if self.llm else None
 
     def _get_llama_index_llm(self, config):
         """
         Helper to instantiate LlamaIndex LLM based on config.
         Duplicated logic from llama_index_factory for now to avoid circular imports or complex refactors.
         """
-        from backend.app.models.settings import LlmProvider
+        from backend.ingestion.settings import LlmProvider
         try:
             if config.provider == LlmProvider.OPENAI:
                 from llama_index.llms.openai import OpenAI
@@ -79,8 +82,10 @@ class ClassificationService:
             elif config.provider == LlmProvider.OLLAMA:
                 from llama_index.llms.ollama import Ollama
                 return Ollama(model=config.model, base_url=config.api_base)
-        except ImportError:
-            logger.warning("Could not import LlamaIndex LLM provider. Classification may fail.")
+        except ImportError as e:
+            logger.warning(f"Could not import LlamaIndex LLM provider: {e}. Classification may fail.")
+        except Exception as e:
+            logger.warning(f"Error instantiating LLM: {e}. Classification may fail.")
         return None
 
     def classify_document_sync(self, text: str) -> ClassificationResult:

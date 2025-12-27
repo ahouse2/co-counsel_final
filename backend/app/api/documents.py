@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Header, BackgroundTasks, Form
 from fastapi.responses import StreamingResponse
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pydantic import BaseModel
 import asyncio
 import logging
@@ -14,11 +14,37 @@ from backend.ingestion.ocr import OcrEngine
 from backend.app.config import Settings, get_settings
 from backend.app.services.vector import get_vector_service, VectorService
 from backend.app.services.graph import get_graph_service, GraphService
+from backend.app.services.case_service import CaseService
+from backend.app.database import get_db
+from sqlalchemy.orm import Session
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def ensure_case_exists(case_id: str, db: Session) -> Tuple[str, bool]:
+    """
+    Ensure a case exists. If case_id is 'default_case' or empty, auto-create a new case.
+    Returns (actual_case_id, was_created).
+    """
+    if case_id and case_id != 'default_case':
+        # Check if case exists
+        case_service = CaseService(db)
+        existing = case_service.get_case(case_id)
+        if existing:
+            return case_id, False
+        # Case ID provided but doesn't exist - create it
+        logger.info(f"Case {case_id} not found, creating new case")
+    
+    # Auto-create a new case
+    case_service = CaseService(db)
+    new_case = case_service.create_case(
+        name="Auto-created Case",
+        description="Automatically created when uploading documents"
+    )
+    logger.info(f"Auto-created case {new_case.case_number} ({new_case.id})")
+    return new_case.id, True
 
 def get_document_service(
     settings: Settings = Depends(get_settings),
@@ -185,9 +211,19 @@ async def upload_chunk(
     background_tasks: BackgroundTasks = None,
     x_gemini_api_key: Optional[str] = Header(None),
     x_courtlistener_api_key: Optional[str] = Header(None),
-    document_service: DocumentService = Depends(get_document_service)
+    document_service: DocumentService = Depends(get_document_service),
+    db: Session = Depends(get_db)
 ):
-    logger.info(f"Received chunk upload: {chunk_index + 1}/{total_chunks} with {len(files)} files for case_id={case_id}")
+    # Auto-create case if needed (first chunk only to avoid race conditions)
+    actual_case_id = case_id
+    if chunk_index == 0:
+        actual_case_id, was_created = ensure_case_exists(case_id, db)
+        if was_created:
+            logger.info(f"Auto-created case for upload: {actual_case_id}")
+    else:
+        actual_case_id = case_id  # Subsequent chunks use the same case_id
+    
+    logger.info(f"Received chunk upload: {chunk_index + 1}/{total_chunks} with {len(files)} files for case_id={actual_case_id}")
     
     api_keys = {}
     if x_gemini_api_key:
@@ -218,7 +254,7 @@ async def upload_chunk(
             logger.debug(f"Processing file {idx + 1}/{len(files)}: {filename}")
             
             result = await document_service.upload_document(
-                case_id=case_id,
+                case_id=actual_case_id,
                 doc_type="my_documents",
                 file_content=file_content,
                 file_name=file_name,
@@ -254,6 +290,7 @@ async def upload_chunk(
         "total_chunks": total_chunks,
         "files_processed": len(results),
         "files_total": len(files),
+        "case_id": actual_case_id,  # Return actual case ID (may be auto-created)
         "data": results
     }
 

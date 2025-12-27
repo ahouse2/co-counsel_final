@@ -174,12 +174,33 @@ class VectorService:
                 )
             return scored
         assert self.client is not None
-        return self.client.search(
-            collection_name=self.settings.qdrant_collection,
-            query_vector=list(vector),
-            limit=top_k,
-            with_payload=True,
-        )
+        try:
+            # Try newer API first (qdrant-client >= 1.16)
+            results = self.client.query_points(
+                collection_name=self.settings.qdrant_collection,
+                query=list(vector),
+                limit=top_k,
+                with_payload=True,
+            )
+            # query_points returns QueryResponse with .points attribute
+            return [
+                qmodels.ScoredPoint(
+                    id=point.id,
+                    score=point.score,
+                    payload=point.payload,
+                    version=getattr(point, 'version', 0),
+                    vector=getattr(point, 'vector', None),
+                )
+                for point in results.points
+            ]
+        except AttributeError:
+            # Fallback to older API (qdrant-client < 1.16)
+            return self.client.search(
+                collection_name=self.settings.qdrant_collection,
+                query_vector=list(vector),
+                limit=top_k,
+                with_payload=True,
+            )
 
     def get_all_embeddings(self, limit: int = 1000) -> List[Dict[str, Any]]:
         """

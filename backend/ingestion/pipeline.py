@@ -416,68 +416,20 @@ def run_ingestion_pipeline(
 
                 triples = extract_triples(cleaned_text)
                 
-                if runtime_config.cost_mode == "community":
-                    categories = heuristic_categorize(cleaned_text)
-                    tags = heuristic_tag(cleaned_text)
-                else:
-                    # Use LlamaIndex ClassificationService
-                    from backend.app.services.classification_service import ClassificationService
-                    classification_service = ClassificationService() # It initializes its own LLM
-                    
-                    # We need to await this, but we are in a sync function `run_ingestion_pipeline`.
-                    # We should probably run this in an event loop or make `run_ingestion_pipeline` async.
-                    # `run_ingestion_pipeline` is called by `process_ingestion` which IS async.
-                    # However, `run_ingestion_pipeline` is currently sync.
-                    # For now, let's use `asyncio.run` or similar if we are sure there's no loop conflict,
-                    # OR just use the synchronous `select` method if available.
-                    # LLMMultiSelector has `select` (sync) and `aselect` (async).
-                    # Let's use `select` (sync) to avoid async complications in this sync function.
-                    
-                    # Wait, I implemented `classify_document` as `async`. I should verify if I can change it to sync or call it sync.
-                    # Let's check `classification_service.py` I just wrote. I made it `async def classify_document`.
-                    # I should probably update `classification_service.py` to have a sync method or use `asyncio.run`.
-                    # But `run_ingestion_pipeline` is running inside FastAPI which has an event loop. `asyncio.run` might fail.
-                    # Ideally `run_ingestion_pipeline` should be async.
-                    # Let's check `document_service.py` where it's called.
-                    # `process_ingestion` calls `run_ingestion_pipeline`. `process_ingestion` is async.
-                    # So we can make `run_ingestion_pipeline` async!
-                    # But that requires changing the signature and all calls.
-                    # Let's see if I can just use a sync wrapper in `ClassificationService`.
-                    
-                    # Actually, `LLMMultiSelector`'s `select` method is sync. 
-                    # I will modify `ClassificationService` to expose a sync `classify_document_sync` or just use `select`.
-                    
-                    # For now, let's assume I'll add a sync method to `ClassificationService` in the next step.
-                    # Or I can just use `asyncio.run_coroutine_threadsafe`? No, that's messy.
-                    
-                    # Let's try to make `run_ingestion_pipeline` async. It's a big change?
-                    # It's defined in `pipeline.py`.
-                    # Let's look at `document_service.py`.
-                    # `pipeline_result = run_ingestion_pipeline(...)`
-                    # If I change it to `await run_ingestion_pipeline(...)`, I need to update `document_service.py`.
-                    # That seems cleaner for the future.
-                    
-                    # BUT, `run_ingestion_pipeline` is also imported by `ingestion_worker.py` maybe?
-                    # Let's check usage.
-                    # I'll stick to adding a sync method to `ClassificationService` for minimal friction now.
-                    
-                    cls_result = classification_service.classify_document_sync(cleaned_text)
-                    categories = cls_result.categories
-                    tags = cls_result.tags
-                    
-                    # Merge extracted metadata into the document metadata
-                    if cls_result.metadata:
-                        # We want to preserve this metadata. 
-                        # Ideally, we should add it to the DocumentPipelineResult or the node metadata.
-                        # For now, let's add it to the first node's metadata as a simple hack, 
-                        # or better, add it to the DocumentPipelineResult if we added a field for it.
-                        # The DocumentPipelineResult definition in this file doesn't have a generic metadata field,
-                        # but it has `categories` and `tags`.
-                        # Let's add the summary to the first node's metadata so it's searchable.
-                        if pipeline_nodes:
-                            pipeline_nodes[0].metadata["ai_summary"] = cls_result.metadata.get("summary")
-                            pipeline_nodes[0].metadata["ai_sentiment"] = cls_result.metadata.get("sentiment")
-                            pipeline_nodes[0].metadata["ai_entities"] = cls_result.metadata.get("key_entities")
+                # Use LLM-based classification for all documents
+                from backend.app.services.classification_service import ClassificationService
+                classification_service = ClassificationService()
+                
+                cls_result = classification_service.classify_document_sync(cleaned_text)
+                categories = cls_result.categories
+                tags = cls_result.tags
+                
+                # Merge extracted metadata into the document metadata
+                if cls_result.metadata:
+                    if pipeline_nodes:
+                        pipeline_nodes[0].metadata["ai_summary"] = cls_result.metadata.get("summary")
+                        pipeline_nodes[0].metadata["ai_sentiment"] = cls_result.metadata.get("sentiment")
+                        pipeline_nodes[0].metadata["ai_entities"] = cls_result.metadata.get("key_entities")
                     
                 doc_type = loaded.source.metadata.get("doc_type")
                 if doc_type == "opposition_documents":
@@ -515,21 +467,16 @@ def run_ingestion_pipeline(
                 flags=flags, # Added
             ))
 
-        # 6. Graph Indexing (Pro Mode)
-        if runtime_config.cost_mode != "community":
-            try:
-                from backend.app.services.knowledge_graph_service import get_knowledge_graph_service
-                kg_service = get_knowledge_graph_service()
-                
-                # We need to pass LlamaIndex Documents. 
-                # We already created `llama_documents` in step 2.
-                # But `build_graph_index` is sync.
-                # We can call it directly.
-                logger.info(f"Starting Graph Indexing for {len(llama_documents)} documents...")
-                kg_service.build_graph_index(llama_documents, case_id=source.metadata.get("case_id"))
-                logger.info("Graph Indexing completed.")
-            except Exception as e:
-                logger.error(f"Graph Indexing failed: {e}", exc_info=True)
+        # 6. Graph Indexing - Always write to knowledge graph
+        try:
+            from backend.app.services.knowledge_graph_service import get_knowledge_graph_service
+            kg_service = get_knowledge_graph_service()
+            
+            logger.info(f"Starting Graph Indexing for {len(llama_documents)} documents...")
+            kg_service.build_graph_index(llama_documents, case_id=source.metadata.get("case_id"))
+            logger.info("Graph Indexing completed.")
+        except Exception as e:
+            logger.error(f"Graph Indexing failed: {e}", exc_info=True)
 
         return PipelineResult(job_id=job_id, source=source, documents=documents_result)
 

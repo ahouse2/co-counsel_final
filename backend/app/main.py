@@ -6,7 +6,7 @@ from .telemetry import setup_telemetry
 from .events import register_events
 
 # Routers
-from .api import retrieval, graph, agents, scenarios, auth, evidence_binder, predictive_analytics, settings as settings_api, graphql, health, billing, onboarding, legal_research, legal_theory, argument_mapping, strategic_recommendations, timeline, voice, ingestion, knowledge, dev_agent, sandbox, cost, documents, document_drafting, binder_preparation, feedback, mock_trial, forensics, knowledge_graph, service_of_process, users, cases, trial_university, halo, agents_status, agents_stream, memory, autonomous_scraping, autonomous_courtlistener, video_generation, narrative, adversarial, evidence_map, simulation, jury_sentiment, metrics, context, intelligence, devils_advocate, financial_forensics, swarms, agent_console
+from .api import retrieval, graph, agents, scenarios, auth, evidence_binder, predictive_analytics, settings as settings_api, graphql, health, billing, onboarding, legal_research, legal_theory, argument_mapping, strategic_recommendations, timeline, voice, ingestion, knowledge, dev_agent, sandbox, cost, documents, document_drafting, binder_preparation, feedback, mock_trial, forensics, knowledge_graph, service_of_process, users, cases, trial_university, halo, agents_status, agents_stream, memory, autonomous_scraping, autonomous_courtlistener, video_generation, narrative, adversarial, evidence_map, simulation, jury_sentiment, metrics, context, intelligence, devils_advocate, financial_forensics, swarms, agent_console, orchestrator, interview
 from .memory_store import CaseMemoryStore
 from .api import memory
 
@@ -174,11 +174,39 @@ app.include_router(metrics.router, prefix="/api", tags=["Metrics"])
 app.include_router(intelligence.router, prefix="/api/intelligence", tags=["Intelligence"])
 app.include_router(swarms.router, prefix="/api", tags=["Swarms"])
 app.include_router(agent_console.router, prefix="/api", tags=["Agent Console"])
+app.include_router(orchestrator.router, prefix="/api/orchestrator", tags=["Orchestrator"])
+app.include_router(interview.router, prefix="/api/interview", tags=["Interview"])
 
 # DB init
 from .database import engine, Base
 from .models import service_of_process, document, recipient, role, user_role, permission, role_permission, case
 Base.metadata.create_all(bind=engine)
+
+# Simple startup migration for schema changes
+def run_startup_migrations():
+    """Run any pending schema migrations."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+    
+    migrations = [
+        # Add case_number column to cases table if it doesn't exist
+        ("cases", "case_number", "ALTER TABLE cases ADD COLUMN IF NOT EXISTS case_number VARCHAR"),
+        ("cases", "case_number_idx", "CREATE INDEX IF NOT EXISTS ix_cases_case_number ON cases(case_number)"),
+    ]
+    
+    with engine.begin() as conn:
+        for table, name, sql in migrations:
+            try:
+                conn.execute(text(sql))
+                logger.info(f"Migration applied: {table}.{name}")
+            except (OperationalError, ProgrammingError) as e:
+                # Column/index might already exist or other DB-specific issues
+                logger.debug(f"Migration skipped {table}.{name}: {e}")
+
+try:
+    run_startup_migrations()
+except Exception as e:
+    logger.error(f"Startup migrations failed: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # AUTONOMOUS ORCHESTRATOR LIFECYCLE

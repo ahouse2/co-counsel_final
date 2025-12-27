@@ -18,15 +18,15 @@ class Settings(BaseSettings):
     model_providers_secondary: str | None = Field(default="openai")
     provider: Optional[str] = Field(default=None)
     gemini_api_key: Optional[str] = Field(default=None)
-    default_chat_model: str = Field(default="gemini-2.5-flash")
+    default_chat_model: str = Field(default="gemini-2.5-flash-lite")
     default_embedding_model: str = Field(default="text-embedding-004")
-    default_vision_model: str = Field(default="gemini-2.5-flash")
+    default_vision_model: str = Field(default="gemini-2.5-flash-lite")
     
     # Specialized Agent Models (2025)
-    strategy_model: str = Field(default="gemini-3.0")
-    analysis_model: str = Field(default="gemini-3.0")
-    drafting_model: str = Field(default="gemini-3.0")
-    cocounsel_voice_model: str = Field(default="gemini-3.0-multimodal-live") # For lifelike avatar chat
+    strategy_model: str = Field(default="gemini-2.5-flash-lite")
+    analysis_model: str = Field(default="gemini-2.5-flash-lite")
+    drafting_model: str = Field(default="gemini-2.5-flash-lite")
+    cocounsel_voice_model: str = Field(default="gemini-2.5-flash-native-audio-dialog") # For lifelike avatar chat
     provider_api_base_urls: Dict[str, str] = Field(
         default_factory=lambda: {
             "openai": "https://api.openai.com/v1",

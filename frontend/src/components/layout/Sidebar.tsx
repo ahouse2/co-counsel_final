@@ -12,20 +12,38 @@ import {
     BrainCircuit,
     LogOut,
     User,
-    Scale
+    Scale,
+    LayoutDashboard,
+    HelpCircle,
+    Search,
+    Sparkles,
+    FileEdit,
+    Shield,
+    Microscope,
+    DollarSign,
+    PlayCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 
 const MENU_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
-    { id: 'graph', label: 'Graph Explorer', icon: Network },
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'interview', label: 'Case Interview', icon: HelpCircle },
+    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'timeline', label: 'Timeline', icon: Clock },
-    { id: 'documents', label: 'Document Viewer', icon: FileText },
-    { id: 'university', label: 'Trial University', icon: GraduationCap },
-    { id: 'arena', label: 'Mock Trial Arena', icon: Gavel },
+    { id: 'graph', label: 'Knowledge Graph', icon: Network },
+    { id: 'theory', label: 'Legal Theory', icon: Sparkles },
+    { id: 'research', label: 'Legal Research', icon: Search },
+    { id: 'drafting', label: 'Document Drafting', icon: FileEdit },
     { id: 'context', label: 'Context Engine', icon: BrainCircuit },
+    { id: 'forensics', label: 'Forensics', icon: Microscope },
     { id: 'jury', label: 'Jury Sentiment', icon: Scale },
+    { id: 'arena', label: 'Mock Trial', icon: Gavel },
+    { id: 'devils_advocate', label: "Devil's Advocate", icon: Shield },
+    { id: 'assethunter', label: 'Asset Hunter', icon: DollarSign },
+    { id: 'presentation', label: 'Presentation', icon: PlayCircle },
+    { id: 'university', label: 'Trial University', icon: GraduationCap },
+    { id: 'chat', label: 'AI Chat', icon: MessageSquare },
 ];
 
 export function Sidebar() {

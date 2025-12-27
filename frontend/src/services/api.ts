@@ -277,6 +277,30 @@ export const endpoints = {
             api.post('/api/swarms/trigger', { swarm_name: swarmName, case_id: caseId, params }),
         agents: (swarmName: string) => api.get(`/api/swarms/${swarmName}/agents`),
     },
+    // Orchestrator - Autonomous Pipeline Control
+    orchestrator: {
+        activity: () => api.get('/api/orchestrator/activity'),
+        messages: () => api.get('/api/orchestrator/messages'),
+        status: () => api.get('/api/orchestrator/status'),
+        swarms: () => api.get('/api/orchestrator/swarms'),
+        trigger: (caseId: string, stage?: string) => api.post('/api/orchestrator/trigger', { case_id: caseId, stage }),
+        start: () => api.post('/api/orchestrator/start'),
+        stop: () => api.post('/api/orchestrator/stop'),
+    },
+    // Interview - User Context Q&A
+    interview: {
+        getStatus: (caseId: string) => api.get(`/api/interview/${caseId}/interview/status`),
+        getQuestions: (caseId: string, pendingOnly: boolean = false) =>
+            api.get(`/api/interview/${caseId}/interview/questions?pending_only=${pendingOnly}`),
+        generateQuestions: (caseId: string, maxQuestions: number = 10) =>
+            api.post(`/api/interview/${caseId}/interview/generate`, { max_questions: maxQuestions }),
+        submitResponse: (caseId: string, questionId: string, response: string | null, status: string = 'answered') =>
+            api.post(`/api/interview/${caseId}/interview/questions/${questionId}/respond`, { response, status }),
+        reset: (caseId: string) => api.delete(`/api/interview/${caseId}/interview/reset`),
+        // Fact Patterns
+        getFactPatterns: (caseId: string) => api.get(`/api/interview/${caseId}/fact-patterns`),
+        extractFactPatterns: (caseId: string) => api.post(`/api/interview/${caseId}/fact-patterns/extract`),
+    },
     // Settings
     settings: {
         get: () => api.get('/api/settings'),

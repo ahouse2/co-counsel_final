@@ -18,7 +18,11 @@ export function CaseSelector() {
     const [newCaseName, setNewCaseName] = useState('');
 
     const currentCase = cases.find(c => c.id === caseId);
-    const displayName = currentCase?.name || caseId || 'Select Case';
+    const displayName = currentCase
+        ? `${currentCase.case_number || ''} ${currentCase.name}`.trim()
+        : caseId === 'default_case'
+            ? '⚠️ No Case Selected'
+            : 'Select Case';
 
     const handleCreateCase = async () => {
         if (!newCaseName.trim()) return;
@@ -84,10 +88,17 @@ export function CaseSelector() {
                                     }`}
                             >
                                 <Briefcase size={14} className="flex-shrink-0" />
-                                <div className="min-w-0">
-                                    <div className="font-medium truncate">{c.name}</div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        {c.case_number && (
+                                            <span className="text-xs font-mono text-halo-cyan bg-halo-cyan/10 px-1.5 py-0.5 rounded">
+                                                {c.case_number}
+                                            </span>
+                                        )}
+                                        <span className="font-medium truncate">{c.name}</span>
+                                    </div>
                                     {c.description && (
-                                        <div className="text-xs text-halo-muted truncate">{c.description}</div>
+                                        <div className="text-xs text-halo-muted truncate mt-0.5">{c.description}</div>
                                     )}
                                 </div>
                             </button>

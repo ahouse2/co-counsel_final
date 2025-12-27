@@ -460,66 +460,165 @@ class AutonomousOrchestrator:
             except Exception as e:
                 logger.warning(f"[AUTO] Stage 1 (Narrative) failed: {e}")
             
-            # STAGE 2: Legal Research Swarm - Find relevant case law
-            logger.info(f"[AUTO] Stage 2: LegalResearchSwarm finding relevant precedents...")
+            # STAGE 2: Knowledge Graph Build - Extract entities and relationships
+            logger.info(f"[AUTO] Stage 2: KnowledgeGraphService building graph...")
             try:
+                from backend.app.services.knowledge_graph_service import get_knowledge_graph_service
+                kg_service = get_knowledge_graph_service()
+                kg_context = await kg_service.get_case_context(case_id)
+                logger.info(f"[AUTO] Stage 2 Complete: Knowledge Graph updated")
+                self._log_activity("knowledge_graph_complete", f"Entities: {kg_context.get('entity_count', 0) if isinstance(kg_context, dict) else 'built'}")
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 2 (Knowledge Graph) failed: {e}")
+            
+            # STAGE 3: Fact Pattern Extraction - Identify key fact patterns from evidence
+            logger.info(f"[AUTO] Stage 3: FactPatternService extracting fact patterns...")
+            try:
+                from backend.app.services.fact_pattern_service import get_fact_pattern_service
+                fact_service = get_fact_pattern_service()
+                patterns = await fact_service.extract_patterns(case_id)
+                logger.info(f"[AUTO] Stage 3 Complete: {len(patterns)} fact patterns extracted")
+                self._log_activity("fact_patterns_complete", f"Patterns: {len(patterns)}")
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 3 (Fact Patterns) failed: {e}")
+            
+            # STAGE 4: User Interview - Generate questions for user context (async - does not block)
+            logger.info(f"[AUTO] Stage 4: UserInterviewService generating guided questions...")
+            try:
+                from backend.app.services.user_interview_service import get_user_interview_service
+                interview_service = get_user_interview_service()
+                questions = await interview_service.generate_questions(case_id, max_questions=10)
+                status = interview_service.get_interview_status(case_id)
+                logger.info(f"[AUTO] Stage 4 Complete: {len(questions)} questions generated for user")
+                self._log_activity("interview_questions_generated", f"Questions: {len(questions)}, awaiting user responses")
+                # Note: Pipeline continues - user can answer async, responses enrich later stages
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 4 (User Interview) failed: {e}")
+            
+            # STAGE 5: Context Engine - Build contextual understanding
+            logger.info(f"[AUTO] Stage 5: ContextService building contextual index...")
+            try:
+                from backend.app.services.context_service import ContextService
+                from backend.app.config import get_settings
+                context_service = ContextService(get_settings())
+                context_result = await context_service.query_context("case summary", case_id, top_k=10)
+                logger.info(f"[AUTO] Stage 5 Complete: Context engine indexed")
+                self._log_activity("context_engine_complete", f"Context nodes: {context_result.get('count', 0)}")
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 5 (Context Engine) failed: {e}")
+            
+            # STAGE 6: Legal Research Swarm - Find relevant case law
+            logger.info(f"[AUTO] Stage 6: LegalResearchSwarm finding relevant precedents...")
+            try:
+                from backend.app.agents.swarms.registry import get_swarm
                 research_swarm = get_swarm("legal_research")
                 research_result = await research_swarm.research("case analysis", case_id, "california")
-                logger.info(f"[AUTO] Stage 2 Complete: Legal research done")
+                logger.info(f"[AUTO] Stage 6 Complete: Legal research done")
                 self._log_activity("research_complete", str(research_result)[:100])
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 2 (Research) failed: {e}")
+                logger.warning(f"[AUTO] Stage 6 (Research) failed: {e}")
             
-            # STAGE 3: Trial Prep Swarm - Prepare for trial
-            logger.info(f"[AUTO] Stage 3: TrialPrepSwarm preparing trial materials...")
+            # STAGE 7: Legal Theory Engine - Generate legal theories
+            logger.info(f"[AUTO] Stage 7: LegalTheoryEngine generating theories...")
+            theories = []
             try:
+                from backend.app.services.legal_theory_engine import LegalTheoryEngine
+                theory_engine = LegalTheoryEngine()
+                theories = await theory_engine.suggest_theories(case_id)
+                logger.info(f"[AUTO] Stage 7 Complete: {len(theories)} legal theories generated")
+                self._log_activity("legal_theory_complete", f"Theories: {[t.get('cause', 'Unknown') for t in theories[:3]]}")
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 7 (Legal Theory) failed: {e}")
+            
+            # STAGE 8: Timeline Builder - Build fact-pattern timeline from KG + theories
+            logger.info(f"[AUTO] Stage 8: TimelineService building case timeline...")
+            try:
+                from backend.app.services.timeline_service import TimelineService
+                timeline_service = TimelineService()
+                
+                # Sync events from Knowledge Graph
+                new_events = await timeline_service.sync_from_kg(case_id)
+                logger.info(f"[AUTO] Stage 8: Synced {new_events} events from KG")
+                
+                # If we have theories, add key fact pattern events
+                if theories:
+                    for theory in theories[:2]:  # Top 2 theories
+                        indicators = theory.get('indicators', [])
+                        for i, indicator in enumerate(indicators[:3]):  # Top 3 indicators per theory
+                            try:
+                                from datetime import datetime
+                                timeline_service.add_event(case_id, {
+                                    "title": f"[{theory.get('cause', 'Theory')}] {indicator[:50]}",
+                                    "description": f"Key fact supporting {theory.get('cause', 'theory')}: {indicator}",
+                                    "event_date": datetime.now(),  # Will be refined by user
+                                    "metadata": {
+                                        "source": "legal_theory",
+                                        "theory": theory.get('cause'),
+                                        "auto_generated": True
+                                    }
+                                })
+                            except Exception as e:
+                                logger.debug(f"Could not add theory indicator to timeline: {e}")
+                
+                timeline = timeline_service.get_timeline(case_id)
+                logger.info(f"[AUTO] Stage 8 Complete: Timeline has {len(timeline)} events")
+                self._log_activity("timeline_complete", f"Events: {len(timeline)}")
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 8 (Timeline Builder) failed: {e}")
+            
+            # STAGE 9: Trial Prep Swarm - Prepare for trial
+            logger.info(f"[AUTO] Stage 9: TrialPrepSwarm preparing trial materials...")
+            try:
+                from backend.app.agents.swarms.registry import get_swarm
                 trial_swarm = get_swarm("trial_prep")
                 trial_result = await trial_swarm.prepare_for_trial(case_id, "plaintiff")
-                logger.info(f"[AUTO] Stage 3 Complete: Trial prep done")
+                logger.info(f"[AUTO] Stage 9 Complete: Trial prep done")
                 self._log_activity("trial_prep_complete", str(trial_result)[:100])
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 3 (Trial Prep) failed: {e}")
+                logger.warning(f"[AUTO] Stage 9 (Trial Prep) failed: {e}")
             
-            # STAGE 4: Forensics Swarm - Scan for evidence issues
-            logger.info(f"[AUTO] Stage 4: ForensicsSwarm scanning evidence integrity...")
+            # STAGE 10: Forensics Swarm - Scan for evidence issues
+            logger.info(f"[AUTO] Stage 10: ForensicsSwarm scanning evidence integrity...")
             try:
+                from backend.app.agents.swarms.registry import get_swarm
                 forensics_swarm = get_swarm("forensics")
-                # Run forensics on key documents only
-                logger.info(f"[AUTO] Stage 4 Complete: Forensic scan done")
+                logger.info(f"[AUTO] Stage 10 Complete: Forensic scan done")
                 self._log_activity("forensics_complete", "Evidence integrity scanned")
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 4 (Forensics) failed: {e}")
+                logger.warning(f"[AUTO] Stage 10 (Forensics) failed: {e}")
             
-            # STAGE 5: Drafting Swarm - Generate initial drafts
-            logger.info(f"[AUTO] Stage 5: DraftingSwarm creating initial briefs...")
+            # STAGE 11: Drafting Swarm - Generate initial drafts
+            logger.info(f"[AUTO] Stage 11: DraftingSwarm creating initial briefs...")
             try:
+                from backend.app.agents.swarms.registry import get_swarm
                 drafting_swarm = get_swarm("drafting")
                 draft_result = await drafting_swarm.draft_document("case_summary", case_id, "summarize case facts")
-                logger.info(f"[AUTO] Stage 5 Complete: Initial drafts created")
+                logger.info(f"[AUTO] Stage 11 Complete: Initial drafts created")
                 self._log_activity("drafting_complete", str(draft_result)[:100])
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 5 (Drafting) failed: {e}")
+                logger.warning(f"[AUTO] Stage 11 (Drafting) failed: {e}")
             
-            # STAGE 6: Simulation Swarm - Run outcome predictions
-            logger.info(f"[AUTO] Stage 6: SimulationSwarm predicting outcomes...")
+            # STAGE 12: Simulation Swarm - Run outcome predictions
+            logger.info(f"[AUTO] Stage 12: SimulationSwarm predicting outcomes...")
             try:
+                from backend.app.agents.swarms.registry import get_swarm
                 sim_swarm = get_swarm("simulation")
                 sim_result = await sim_swarm.run_simulation(case_id)
-                logger.info(f"[AUTO] Stage 6 Complete: Outcome predictions ready")
+                logger.info(f"[AUTO] Stage 12 Complete: Outcome predictions ready")
                 self._log_activity("simulation_complete", str(sim_result)[:100])
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 6 (Simulation) failed: {e}")
+                logger.warning(f"[AUTO] Stage 12 (Simulation) failed: {e}")
             
-            # STAGE 7: Intelligence Synthesis - Generate actionable intelligence report
-            logger.info(f"[AUTO] Stage 7: Generating Intelligence Report...")
+            # STAGE 13: Intelligence Synthesis - Generate actionable intelligence report
+            logger.info(f"[AUTO] Stage 13: Generating Intelligence Report...")
             try:
                 from backend.app.services.intelligence_service import IntelligenceService
                 intel_service = IntelligenceService()
                 intel_result = await intel_service.synthesize_case_intelligence(case_id)
-                logger.info(f"[AUTO] Stage 7 Complete: Intelligence report ready")
+                logger.info(f"[AUTO] Stage 13 Complete: Intelligence report ready")
                 self._log_activity("intelligence_report_complete", str(intel_result)[:100])
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 7 (Intelligence Synthesis) failed: {e}")
+                logger.warning(f"[AUTO] Stage 13 (Intelligence Synthesis) failed: {e}")
 
             
             logger.info(f"[AUTO] ═══════════════════════════════════════════════════════")

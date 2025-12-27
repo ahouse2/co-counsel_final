@@ -461,63 +461,63 @@ class KnowledgeGraphService:
         This is a synchronous method as LlamaIndex construction is typically sync.
         """
         try:
-            from llama_index.graph_stores.neo4j import Neo4jGraphStore
+            # Try the new package import path first (llama-index-graph-stores-neo4j)
+            try:
+                from llama_index.graph_stores.neo4j import Neo4jGraphStore
+            except ImportError:
+                try:
+                    from llama_index_graph_stores_neo4j import Neo4jGraphStore
+                except ImportError:
+                    print("Warning: Neo4jGraphStore not available. Install llama-index-graph-stores-neo4j package.")
+                    return None
+            
             from llama_index.core import StorageContext, KnowledgeGraphIndex
             from backend.ingestion.llama_index_factory import create_llm_service, create_embedding_model
+            from backend.ingestion.settings import build_llm_config, build_embedding_config
             from backend.app.config import get_settings
             
             settings = get_settings()
             
-            # Initialize LlamaIndex components
-            # We need to recreate the LLM and Embedding models here or pass them in.
-            # Using factory for consistency.
-            llm_service = create_llm_service(settings.llm)
-            # We need the underlying LlamaIndex LLM object
-            # Re-using the logic from classification_service/llama_index_factory
-            # Ideally this should be a shared utility.
-            from backend.app.services.classification_service import ClassificationService
-            # Hack: instantiate ClassificationService just to get the LLM if we don't want to duplicate code
-            # Or just duplicate the small snippet for now.
-            # Let's duplicate for safety and independence.
+            # Build configs from settings
+            llm_config = build_llm_config(settings)
+            embedding_config = build_embedding_config(settings)
             
+            # Get LlamaIndex LLM
             llm = None
-            from backend.app.models.settings import LlmProvider
-            config = settings.llm
-            if config.provider == LlmProvider.OPENAI:
+            from backend.ingestion.settings import LlmProvider
+            if llm_config.provider == LlmProvider.OPENAI:
                 from llama_index.llms.openai import OpenAI
-                llm = OpenAI(model=config.model, api_key=config.api_key, api_base=config.api_base)
-            elif config.provider == LlmProvider.GEMINI:
+                llm = OpenAI(model=llm_config.model, api_key=llm_config.api_key, api_base=llm_config.api_base)
+            elif llm_config.provider == LlmProvider.GEMINI:
                 from llama_index.llms.gemini import Gemini
-                llm = Gemini(model=config.model, api_key=config.api_key)
-            # ... add others as needed
+                llm = Gemini(model=llm_config.model, api_key=llm_config.api_key)
+            elif llm_config.provider == LlmProvider.OLLAMA:
+                from llama_index.llms.ollama import Ollama
+                llm = Ollama(model=llm_config.model, base_url=llm_config.api_base)
             
             if not llm:
                 print("Warning: No valid LLM found for Graph Indexing.")
-                return
+                return None
 
-            embed_model = create_embedding_model(settings.embedding)
+            embed_model = create_embedding_model(embedding_config)
 
             graph_store = Neo4jGraphStore(
                 username=self.user,
                 password=self.password,
                 url=self.uri,
-                database="neo4j", # Default
+                database="neo4j",
             )
             
             storage_context = StorageContext.from_defaults(graph_store=graph_store)
             
-            # Filter documents for this case if needed, or assume passed documents are relevant.
-            # The `documents` arg should be a list of LlamaIndex Document objects.
-            
             # Create the index
-            # This extracts triplets and stores them in Neo4j
             index = KnowledgeGraphIndex.from_documents(
                 documents,
                 storage_context=storage_context,
                 max_triplets_per_chunk=2,
                 llm=llm,
                 embed_model=embed_model,
-                include_embeddings=True, # Useful for GraphRAG
+                include_embeddings=True,
             )
             
             print(f"Successfully built Knowledge Graph index for {len(documents)} documents.")

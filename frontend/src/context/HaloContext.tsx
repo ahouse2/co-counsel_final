@@ -23,12 +23,16 @@ export type ModuleId =
     | 'classification'
     | 'narrative'
     | 'devils_advocate'
-    | 'jury';
+    | 'jury'
+    | 'interview'
+    | 'dashboard'
+    | 'assethunter';
 
 export type SubmoduleId = string | null;
 
 export interface CaseInfo {
     id: string;
+    case_number?: string;
     name: string;
     description?: string;
     status: string;

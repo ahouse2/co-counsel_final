@@ -118,6 +118,18 @@ const SUBMODULES: Record<ModuleId, { id: string; label: string }[]> = {
         { id: 'analysis', label: 'Sentiment Analysis' },
         { id: 'simulation', label: 'Jury Simulation' },
     ],
+    interview: [
+        { id: 'questions', label: 'Interview Questions' },
+        { id: 'patterns', label: 'Fact Patterns' },
+    ],
+    dashboard: [
+        { id: 'overview', label: 'Overview' },
+        { id: 'pipeline', label: 'Pipeline Status' },
+    ],
+    assethunter: [
+        { id: 'search', label: 'Asset Search' },
+        { id: 'crypto', label: 'Crypto Tracing' },
+    ],
 };
 
 export function HaloLayout({ children }: { children: React.ReactNode }) {

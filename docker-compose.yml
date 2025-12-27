@@ -5,7 +5,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
+      # PostgreSQL connection (required for API startup)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cocounsel}:${POSTGRES_PASSWORD:-change_this_strong_pg_password_456!}@postgres:5432/${POSTGRES_DB:-cocounsel}
       MODEL_PROVIDERS_PRIMARY: ${MODEL_PROVIDERS_PRIMARY:-gemini}
       MODEL_PROVIDERS_SECONDARY: ${MODEL_PROVIDERS_SECONDARY:-openai}
       DEFAULT_CHAT_MODEL: ${DEFAULT_CHAT_MODEL:-gemini-2.5-flash}
