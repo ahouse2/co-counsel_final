@@ -6,7 +6,7 @@ from .telemetry import setup_telemetry
 from .events import register_events
 
 # Routers
-from .api import retrieval, graph, agents, scenarios, auth, evidence_binder, predictive_analytics, settings as settings_api, graphql, health, billing, onboarding, legal_research, legal_theory, argument_mapping, strategic_recommendations, timeline, voice, ingestion, knowledge, dev_agent, sandbox, cost, documents, document_drafting, binder_preparation, feedback, mock_trial, forensics, knowledge_graph, service_of_process, users, cases, trial_university, halo, agents_status, agents_stream, memory, autonomous_scraping, autonomous_courtlistener, video_generation, narrative, adversarial, evidence_map, simulation, jury_sentiment, metrics, context, intelligence, devils_advocate, financial_forensics, swarms, agent_console, orchestrator, interview
+from .api import retrieval, graph, agents, scenarios, auth, evidence_binder, predictive_analytics, settings as settings_api, graphql, health, billing, onboarding, legal_research, legal_theory, argument_mapping, strategic_recommendations, timeline, voice, ingestion, knowledge, dev_agent, sandbox, cost, documents, document_drafting, binder_preparation, feedback, mock_trial, forensics, knowledge_graph, service_of_process, users, cases, trial_university, halo, agents_status, agents_stream, memory, autonomous_scraping, autonomous_courtlistener, video_generation, narrative, adversarial, evidence_map, simulation, jury_sentiment, metrics, context, intelligence, devils_advocate, financial_forensics, swarms, agent_console, orchestrator, interview, presentation
 from .memory_store import CaseMemoryStore
 from .api import memory
 
@@ -176,6 +176,7 @@ app.include_router(swarms.router, prefix="/api", tags=["Swarms"])
 app.include_router(agent_console.router, prefix="/api", tags=["Agent Console"])
 app.include_router(orchestrator.router, prefix="/api/orchestrator", tags=["Orchestrator"])
 app.include_router(interview.router, prefix="/api/interview", tags=["Interview"])
+app.include_router(presentation.router, prefix="/api/presentation", tags=["Presentation"])
 
 # DB init
 from .database import engine, Base

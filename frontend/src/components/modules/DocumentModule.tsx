@@ -1000,7 +1000,7 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
                                             <button
                                                 onClick={() => {
                                                     addLog(`[AGENT] Running forensic analysis on ${selectedDoc.filename}`);
-                                                    endpoints.forensics.analyze(selectedDoc.id, 'default_case')
+                                                    endpoints.forensics.analyze(selectedDoc.id, caseId)
                                                         .then(() => addLog(`[SUCCESS] Forensic analysis complete`))
                                                         .catch(e => addLog(`[ERROR] Analysis failed: ${e.message}`));
                                                 }}

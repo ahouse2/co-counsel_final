@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Presentation, Plus, X, Play, FileText, ChevronRight, ChevronLeft, GripVertical, Search, LayoutTemplate, Minimize2, Loader2 } from 'lucide-react';
 import { endpoints } from '../../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useHalo } from '../../context/HaloContext';
 
 interface Document {
     id: string;
@@ -16,6 +17,7 @@ interface PlaylistItem {
 }
 
 export function InCourtPresentationModule() {
+    const { caseId } = useHalo();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
     const [isPresenting, setIsPresenting] = useState(false);
@@ -25,12 +27,12 @@ export function InCourtPresentationModule() {
 
     useEffect(() => {
         fetchDocuments();
-    }, []);
+    }, [caseId]);
 
     const fetchDocuments = async () => {
         setLoading(true);
         try {
-            const response = await endpoints.documents.list('default_case');
+            const response = await endpoints.documents.list(caseId);
             const docs = Array.isArray(response.data) ? response.data : (response.data.documents || []);
             setDocuments(docs);
         } catch (error) {

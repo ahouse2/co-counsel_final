@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ShieldAlert, Gavel, Flame, AlertTriangle, BrainCircuit } from 'lucide-react';
 import { endpoints } from '../../services/api';
+import { useHalo } from '../../context/HaloContext';
 
 interface ChallengeResult {
     weaknesses: { point: string; explanation: string }[];
@@ -10,6 +11,7 @@ interface ChallengeResult {
 }
 
 export function AdversarialModule() {
+    const { caseId } = useHalo();
     const [theory, setTheory] = useState('');
     const [result, setResult] = useState<ChallengeResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -18,7 +20,7 @@ export function AdversarialModule() {
         if (!theory.trim()) return;
         setLoading(true);
         try {
-            const response = await endpoints.adversarial.challenge('default_case', theory);
+            const response = await endpoints.adversarial.challenge(caseId, theory);
             setResult(response.data);
         } catch (error) {
             console.error("Failed to challenge theory:", error);

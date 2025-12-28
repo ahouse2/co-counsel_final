@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Map as MapIcon, Calendar, Navigation, RefreshCw } from 'lucide-react';
 import { endpoints } from '../../services/api';
+import { useHalo } from '../../context/HaloContext';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -39,6 +40,7 @@ function MapUpdater({ locations }: { locations: LocationData[] }) {
 }
 
 export function EvidenceMapModule() {
+    const { caseId } = useHalo();
     const [locations, setLocations] = useState<LocationData[]>([]);
     const [loading, setLoading] = useState(false);
     const [analyzed, setAnalyzed] = useState(false);
@@ -46,7 +48,7 @@ export function EvidenceMapModule() {
     const handleAnalyze = async () => {
         setLoading(true);
         try {
-            const response = await endpoints.evidenceMap.analyze('default_case');
+            const response = await endpoints.evidenceMap.analyze(caseId);
             setLocations(response.data);
             setAnalyzed(true);
         } catch (error) {

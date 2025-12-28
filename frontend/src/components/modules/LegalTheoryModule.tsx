@@ -4,7 +4,7 @@ import { endpoints } from '../../services/api';
 import { useHalo } from '../../context/HaloContext';
 
 export function LegalTheoryModule() {
-    const { activeSubmodule } = useHalo();
+    const { activeSubmodule, caseId } = useHalo();
     const [facts, setFacts] = useState<string | null>(null);
     const [strategies, setStrategies] = useState<string | null>(null);
     const [elements, setElements] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export function LegalTheoryModule() {
     const handleExtractFacts = async () => {
         setLoadingFacts(true);
         try {
-            const response = await endpoints.context.query("Extract the key fact patterns from the available evidence, focusing on timeline, causality, and inconsistencies.", "default_case");
+            const response = await endpoints.context.query("Extract the key fact patterns from the available evidence, focusing on timeline, causality, and inconsistencies.", caseId);
             const answer = response.data.response || response.data.answer || (typeof response.data === 'string' ? response.data : JSON.stringify(response.data));
             setFacts(answer);
         } catch (error) {
@@ -71,7 +71,7 @@ export function LegalTheoryModule() {
     const handleGenerateStrategy = async () => {
         setLoadingStrategy(true);
         try {
-            const response = await endpoints.context.query("Based on the known facts, outline 3 potential legal strategies for the defense, citing relevant legal principles where possible.", "default_case");
+            const response = await endpoints.context.query("Based on the known facts, outline 3 potential legal strategies for the defense, citing relevant legal principles where possible.", caseId);
             const answer = response.data.response || response.data.answer || (typeof response.data === 'string' ? response.data : JSON.stringify(response.data));
             setStrategies(answer);
         } catch (error) {
@@ -85,7 +85,7 @@ export function LegalTheoryModule() {
     const handleAnalyzeElements = async () => {
         setLoadingElements(true);
         try {
-            const response = await endpoints.context.query("Break down the case into key legal elements (e.g., Duty, Breach, Causation, Damages) and map the available evidence to each element. Identify any missing elements.", "default_case");
+            const response = await endpoints.context.query("Break down the case into key legal elements (e.g., Duty, Breach, Causation, Damages) and map the available evidence to each element. Identify any missing elements.", caseId);
             const answer = response.data.response || response.data.answer || (typeof response.data === 'string' ? response.data : JSON.stringify(response.data));
             setElements(answer);
         } catch (error) {
@@ -103,7 +103,7 @@ export function LegalTheoryModule() {
         setAutonomousMode(false); // Pause auto mode
         setLoadingCustom(true);
         try {
-            const response = await endpoints.context.query(customQuery, "default_case");
+            const response = await endpoints.context.query(customQuery, caseId);
             const answer = response.data.response || response.data.answer || (typeof response.data === 'string' ? response.data : JSON.stringify(response.data));
             setCustomResponse(answer);
         } catch (error) {
@@ -374,8 +374,8 @@ export function LegalTheoryModule() {
                                     <div className="flex justify-between items-start mb-3">
                                         <h4 className="font-bold text-halo-cyan text-sm">{cause.cause || cause.name || `Cause ${i + 1}`}</h4>
                                         <span className={`text-xs px-2 py-1 rounded-full font-bold ${(cause.confidence || cause.score || 0) > 0.7 ? 'bg-green-500/20 text-green-400' :
-                                                (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    'bg-red-500/20 text-red-400'
+                                            (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500/20 text-yellow-400' :
+                                                'bg-red-500/20 text-red-400'
                                             }`}>
                                             {Math.round((cause.confidence || cause.score || 0) * 100)}%
                                         </span>
@@ -408,8 +408,8 @@ export function LegalTheoryModule() {
                                     <div className="mt-3 h-2 bg-black/50 rounded-full overflow-hidden">
                                         <div
                                             className={`h-full transition-all ${(cause.confidence || cause.score || 0) > 0.7 ? 'bg-green-500' :
-                                                    (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500' :
-                                                        'bg-red-500'
+                                                (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500' :
+                                                    'bg-red-500'
                                                 }`}
                                             style={{ width: `${(cause.confidence || cause.score || 0) * 100}%` }}
                                         />
