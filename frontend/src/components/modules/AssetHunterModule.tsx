@@ -273,6 +273,10 @@ export function AssetHunterModule() {
                             <p className="text-emerald-100/80 text-sm">
                                 Visualizing the movement of funds from source wallets through mixers to final destinations.
                             </p>
+                            <div className="mt-2 text-xs text-halo-muted bg-black/40 px-2 py-1 rounded inline-block border border-halo-border/30">
+                                <AlertTriangle size={10} className="inline mr-1 text-yellow-500" />
+                                DEMO DATA: Real-time flow analysis requires enterprise blockchain node access.
+                            </div>
                         </div>
                         <div className="flex-1 bg-black/40 border border-emerald-500/20 rounded-lg p-8">
                             <ResponsiveContainer width="100%" height="100%">

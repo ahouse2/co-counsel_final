@@ -284,9 +284,8 @@ export function HaloLayout({ children }: { children: React.ReactNode }) {
                         {activeModule === node.id && (
                             <motion.div
                                 className="absolute left-1/2 top-1/2 h-[1px] bg-halo-cyan origin-left z-[-1]"
-                                style={{ width: isZoomed ? '150px' : '100px', transform: 'rotate(0deg)' }}
                                 initial={{ scaleX: 0 }}
-                                animate={{ scaleX: 1 }}
+                                animate={{ scaleX: 1, width: isZoomed ? '150px' : '100px' }}
                             />
                         )}
                     </div>

@@ -407,11 +407,11 @@ export function LegalTheoryModule() {
                                     {/* Progress bar */}
                                     <div className="mt-3 h-2 bg-black/50 rounded-full overflow-hidden">
                                         <div
-                                            className={`h-full transition-all ${(cause.confidence || cause.score || 0) > 0.7 ? 'bg-green-500' :
+                                            className={`h-full transition-all dynamic-width ${(cause.confidence || cause.score || 0) > 0.7 ? 'bg-green-500' :
                                                 (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500' :
                                                     'bg-red-500'
                                                 }`}
-                                            style={{ width: `${(cause.confidence || cause.score || 0) * 100}%` }}
+                                            style={{ '--score': `${(cause.confidence || cause.score || 0) * 100}%` } as React.CSSProperties}
                                         />
                                     </div>
                                 </div>

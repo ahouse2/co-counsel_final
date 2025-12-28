@@ -26,6 +26,53 @@ export function ServiceOfProcessModule() {
     const [records, setRecords] = useState<ServiceRecord[]>([]);
     const [, setLoading] = useState(true);
     const [selectedRecord, setSelectedRecord] = useState<ServiceRecord | null>(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [documents, setDocuments] = useState<any[]>([]);
+    const [recipients, setRecipients] = useState<any[]>([]);
+    const [newRequest, setNewRequest] = useState({ documentId: '', recipientId: '' });
+
+    useEffect(() => {
+        // Fetch docs and recipients for the modal
+        const fetchData = async () => {
+            try {
+                const [docsRes, recipientsRes] = await Promise.all([
+                    endpoints.serviceOfProcess.listDocuments(),
+                    endpoints.serviceOfProcess.listRecipients()
+                ]);
+                setDocuments(docsRes.data || []);
+                setRecipients(recipientsRes.data || []);
+            } catch (e) {
+                console.error("Failed to fetch form data", e);
+            }
+        };
+        if (isCreateModalOpen) fetchData();
+    }, [isCreateModalOpen]);
+
+    const handleCreate = async () => {
+        if (!newRequest.documentId || !newRequest.recipientId) return;
+        try {
+            await endpoints.serviceOfProcess.create(newRequest.documentId, newRequest.recipientId);
+            setIsCreateModalOpen(false);
+            // Refresh records
+            const response = await endpoints.serviceOfProcess.list();
+            // ... (re-fetch logic or optimistic update)
+            const data = response.data || [];
+            const mappedRecords: ServiceRecord[] = data.map((r: any) => ({
+                id: r.id,
+                documentName: r.document?.name || 'Unknown Document',
+                recipientName: r.recipient?.name || 'Unknown Recipient',
+                recipientAddress: r.recipient?.address || '',
+                status: r.status?.toLowerCase() || 'pending',
+                servedDate: r.served_date,
+                servedBy: r.served_by,
+                notes: r.notes,
+                createdAt: r.created_at || new Date().toISOString()
+            }));
+            setRecords(mappedRecords);
+        } catch (e) {
+            console.error("Failed to create request", e);
+        }
+    };
 
     useEffect(() => {
         const fetchRecords = async () => {
@@ -77,7 +124,7 @@ export function ServiceOfProcessModule() {
                     </div>
                 </div>
                 <button
-                    onClick={() => console.log("Add modal not implemented")}
+                    onClick={() => setIsCreateModalOpen(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-halo-cyan/20 hover:bg-halo-cyan/30 text-halo-cyan border border-halo-cyan/30 rounded-lg transition-all"
                 >
                     <Plus size={18} />
@@ -216,6 +263,76 @@ export function ServiceOfProcessModule() {
                     </div>
                 </div>
             </div>
+
+            {/* Create Modal */}
+            <AnimatePresence>
+                {isCreateModalOpen && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-halo-card border border-halo-border rounded-lg w-full max-w-md overflow-hidden shadow-2xl"
+                        >
+                            <div className="p-4 border-b border-halo-border flex justify-between items-center bg-halo-bg/50">
+                                <h3 className="text-lg font-light text-halo-text uppercase tracking-wider">New Service Request</h3>
+                                <button
+                                    onClick={() => setIsCreateModalOpen(false)}
+                                    className="text-halo-muted hover:text-white transition-colors"
+                                    aria-label="Close modal"
+                                >
+                                    <Plus size={24} className="rotate-45" />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-xs text-halo-muted uppercase tracking-wider mb-2">Select Document</label>
+                                    <select
+                                        value={newRequest.documentId}
+                                        onChange={(e) => setNewRequest({ ...newRequest, documentId: e.target.value })}
+                                        className="w-full bg-black/50 border border-halo-border rounded p-2 text-halo-text focus:border-halo-cyan outline-none"
+                                        aria-label="Select Document"
+                                    >
+                                        <option value="">-- Select Document --</option>
+                                        {documents.map(d => (
+                                            <option key={d.id} value={d.id}>{d.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-halo-muted uppercase tracking-wider mb-2">Select Recipient</label>
+                                    <select
+                                        value={newRequest.recipientId}
+                                        onChange={(e) => setNewRequest({ ...newRequest, recipientId: e.target.value })}
+                                        className="w-full bg-black/50 border border-halo-border rounded p-2 text-halo-text focus:border-halo-cyan outline-none"
+                                        aria-label="Select Recipient"
+                                    >
+                                        <option value="">-- Select Recipient --</option>
+                                        {recipients.map(r => (
+                                            <option key={r.id} value={r.id}>{r.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="pt-4 flex justify-end gap-3">
+                                    <button
+                                        onClick={() => setIsCreateModalOpen(false)}
+                                        className="px-4 py-2 text-halo-muted hover:text-white text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleCreate}
+                                        disabled={!newRequest.documentId || !newRequest.recipientId}
+                                        className="px-6 py-2 bg-halo-cyan text-black font-bold rounded hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Create Request
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
