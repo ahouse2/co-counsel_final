@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, AlertTriangle, Gavel, RefreshCw, CheckCircle } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Gavel, RefreshCw, CheckCircle, Scale } from 'lucide-react';
 import { endpoints } from '../../services/api';
 
 interface CaseWeakness {
@@ -17,6 +17,14 @@ interface CrossExamQuestion {
     difficulty: string;
 }
 
+interface CritiqueResult {
+    critique: string;
+    score: number;
+    strengths: string[];
+    weaknesses: string[];
+    missing_facts: string[];
+}
+
 interface DevilsAdvocateModuleProps {
     caseId: string;
     isActive: boolean;
@@ -26,9 +34,22 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
     const [weaknesses, setWeaknesses] = useState<CaseWeakness[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [caseTheory, setCaseTheory] = useState("");
+
+    // Cross Exam State
     const [witnessStatement, setWitnessStatement] = useState("");
     const [crossExamQuestions, setCrossExamQuestions] = useState<CrossExamQuestion[]>([]);
     const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+
+    // Critique State
+    const [narrativeText, setNarrativeText] = useState("");
+    const [critiquePerspective, setCritiquePerspective] = useState("neutral");
+    const [critiqueResult, setCritiqueResult] = useState<CritiqueResult | null>(null);
+    const [isCritiquing, setIsCritiquing] = useState(false);
+
+    // Motion State
+    const [activeTab, setActiveTab] = useState<'review' | 'crossexam' | 'critique' | 'motion'>('review');
+    const [motionGrounds, setMotionGrounds] = useState<string[]>([]);
+    const [motionDraft, setMotionDraft] = useState<any | null>(null);
 
     const generateCrossExam = async () => {
         if (!witnessStatement.trim()) return;
@@ -55,10 +76,18 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
         }
     };
 
-    // ... (generateCrossExam remains same)
-    const [activeTab, setActiveTab] = useState<'review' | 'crossexam' | 'motion'>('review');
-    const [motionGrounds, setMotionGrounds] = useState<string[]>([]);
-    const [motionDraft, setMotionDraft] = useState<any | null>(null);
+    const runCritique = async () => {
+        if (!narrativeText.trim()) return;
+        setIsCritiquing(true);
+        try {
+            const res = await endpoints.devilsAdvocate.critique(caseId, narrativeText, critiquePerspective);
+            setCritiqueResult(res.data);
+        } catch (error) {
+            console.error("Failed to run critique", error);
+        } finally {
+            setIsCritiquing(false);
+        }
+    };
 
     const generateMotion = async () => {
         setIsLoading(true);
@@ -78,7 +107,6 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
 
     return (
         <div className="h-full w-full flex flex-col bg-slate-950 text-slate-200 p-6 overflow-hidden">
-            {/* Header and Tabs remain same */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent flex items-center gap-2">
                     <ShieldAlert className="w-6 h-6 text-red-500" />
@@ -105,7 +133,17 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
                         }`}
                 >
                     <Gavel className="w-4 h-4" />
-                    Cross-Examination Sim
+                    Cross-Exam
+                </button>
+                <button
+                    onClick={() => setActiveTab('critique')}
+                    className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${activeTab === 'critique'
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50'
+                        : 'hover:bg-slate-800 text-slate-400'
+                        }`}
+                >
+                    <Scale className="w-4 h-4" />
+                    Narrative Critique
                 </button>
                 <button
                     onClick={() => setActiveTab('motion')}
@@ -121,7 +159,8 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
 
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                 <AnimatePresence mode="wait">
-                    {activeTab === 'review' ? (
+                    {/* CASE REVIEW TAB */}
+                    {activeTab === 'review' && (
                         <motion.div
                             key="review"
                             initial={{ opacity: 0, y: 20 }}
@@ -191,7 +230,10 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
                                 ))
                             )}
                         </motion.div>
-                    ) : activeTab === 'crossexam' ? (
+                    )}
+
+                    {/* CROSS EXAM TAB */}
+                    {activeTab === 'crossexam' && (
                         <motion.div
                             key="crossexam"
                             initial={{ opacity: 0, y: 20 }}
@@ -236,7 +278,97 @@ export const DevilsAdvocateModule: React.FC<DevilsAdvocateModuleProps> = ({ case
                                 ))}
                             </div>
                         </motion.div>
-                    ) : (
+                    )}
+
+                    {/* CRITIQUE TAB */}
+                    {activeTab === 'critique' && (
+                        <motion.div
+                            key="critique"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="flex flex-col h-full"
+                        >
+                            <div className="mb-6 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="block text-sm font-medium text-slate-400">
+                                        Narrative to Critique
+                                    </label>
+                                    <select
+                                        value={critiquePerspective}
+                                        onChange={(e) => setCritiquePerspective(e.target.value)}
+                                        className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none"
+                                        aria-label="Select critique perspective"
+                                    >
+                                        <option value="neutral">Neutral Perspective</option>
+                                        <option value="prosecution">Prosecution Perspective</option>
+                                        <option value="defense">Defense Perspective</option>
+                                    </select>
+                                </div>
+                                <textarea
+                                    value={narrativeText}
+                                    onChange={(e) => setNarrativeText(e.target.value)}
+                                    className="w-full h-32 bg-slate-950 border border-slate-700 rounded-lg p-3 text-slate-200 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
+                                    placeholder="Paste the narrative text here..."
+                                />
+                                <button
+                                    onClick={runCritique}
+                                    disabled={isCritiquing || !narrativeText.trim()}
+                                    className="mt-3 px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                >
+                                    {isCritiquing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4" />}
+                                    Critique Narrative
+                                </button>
+                            </div>
+
+                            {critiqueResult && (
+                                <div className="space-y-4">
+                                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-xl">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-xl font-bold text-purple-300">Critique Results</h3>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-slate-400 text-sm">Score:</span>
+                                                <span className={`text-2xl font-bold ${critiqueResult.score >= 8 ? 'text-green-400' :
+                                                    critiqueResult.score >= 5 ? 'text-yellow-400' :
+                                                        'text-red-400'
+                                                    }`}>
+                                                    {critiqueResult.score}/10
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="prose prose-invert max-w-none mb-6 text-slate-300">
+                                            {critiqueResult.critique}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="bg-green-950/20 border border-green-500/30 p-3 rounded-lg">
+                                                <h4 className="font-bold text-green-400 mb-2 text-sm uppercase">Strengths</h4>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
+                                                    {critiqueResult.strengths?.map((s, i) => <li key={i}>{s}</li>)}
+                                                </ul>
+                                            </div>
+                                            <div className="bg-red-950/20 border border-red-500/30 p-3 rounded-lg">
+                                                <h4 className="font-bold text-red-400 mb-2 text-sm uppercase">Weaknesses</h4>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
+                                                    {critiqueResult.weaknesses?.map((w, i) => <li key={i}>{w}</li>)}
+                                                </ul>
+                                            </div>
+                                            <div className="bg-yellow-950/20 border border-yellow-500/30 p-3 rounded-lg">
+                                                <h4 className="font-bold text-yellow-400 mb-2 text-sm uppercase">Missing Facts</h4>
+                                                <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
+                                                    {critiqueResult.missing_facts?.map((f, i) => <li key={i}>{f}</li>)}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* MOTION TAB */}
+                    {activeTab === 'motion' && (
                         <motion.div
                             key="motion"
                             initial={{ opacity: 0, y: 20 }}

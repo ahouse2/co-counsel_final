@@ -22,6 +22,25 @@ class CrossExamRequest(BaseModel):
     witness_statement: str
     witness_profile: str = ""
 
+class CritiqueRequest(BaseModel):
+    case_id: str
+    narrative_text: str
+    perspective: str # "prosecution" or "defense"
+
+@router.post("/critique")
+async def critique_narrative(
+    request: CritiqueRequest,
+    service: DevilsAdvocateService = Depends(get_devils_advocate_service)
+):
+    """
+    Critiques a narrative from the opposing perspective.
+    """
+    return await service.critique_narrative(
+        case_id=request.case_id,
+        narrative_text=request.narrative_text,
+        perspective=request.perspective
+    )
+
 class ReviewRequest(BaseModel):
     case_theory: str = ""
 

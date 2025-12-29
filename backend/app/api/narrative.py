@@ -20,17 +20,20 @@ def get_narrative_service(
 
 class NarrativeResponse(BaseModel):
     narrative: str
+    perspective: str
 
 @router.get("/{case_id}/generate", response_model=NarrativeResponse)
 async def generate_case_narrative(
     case_id: str,
+    perspective: str = "neutral",
     service: NarrativeService = Depends(get_narrative_service)
 ):
     """
     Generates a narrative summary for the specified case.
+    Perspective: 'neutral', 'prosecution', 'defense'
     """
-    narrative = await service.generate_narrative(case_id)
-    return NarrativeResponse(narrative=narrative)
+    narrative = await service.generate_narrative(case_id, perspective)
+    return NarrativeResponse(narrative=narrative, perspective=perspective)
 
 @router.get("/{case_id}/contradictions", response_model=List[Contradiction])
 async def detect_case_contradictions(

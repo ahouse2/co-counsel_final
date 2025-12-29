@@ -30,7 +30,18 @@ async def trace_crypto(payload: Dict[str, str] = Body(...)) -> Dict[str, Any]:
 @router.post("/assets/scan/{case_id}", summary="Scan for Hidden Assets")
 async def scan_assets(case_id: str) -> Dict[str, Any]:
     """
-    Scans case documents for hidden asset indicators using the Asset Agent.
+    Scans case documents for hidden asset indicators using the Asset Hunter Swarm.
     """
-    agent = AssetAgent()
-    return agent.scan_for_assets(case_id)
+    from backend.app.agents.swarms.asset_hunter_swarm import AssetHunterSwarm
+    from backend.app.services.llm_service import get_llm_service
+    from backend.app.services.knowledge_graph_service import get_kg_service
+    
+    llm_service = get_llm_service()
+    kg_service = get_kg_service()
+    
+    swarm = AssetHunterSwarm(llm_service, kg_service)
+    
+    # Run the swarm investigation
+    result = await swarm.run_investigation(case_id)
+    
+    return result

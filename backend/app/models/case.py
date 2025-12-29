@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Text, Integer
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from backend.app.database import Base
 
 class Case(Base):
@@ -12,4 +13,6 @@ class Case(Base):
     status = Column(String, default="active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    presentations = relationship("Presentation", back_populates="case")
 

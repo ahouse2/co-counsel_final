@@ -198,6 +198,7 @@ export const InterviewModule: React.FC = () => {
                                 </span>
                             </div>
                             <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                                {/* eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop */}
                                 <div
                                     className="h-full bg-gradient-to-r from-halo-cyan to-purple-500 transition-all duration-500 dynamic-progress"
                                     style={{ '--progress': `${(status.answered / status.total_questions) * 100}%` } as React.CSSProperties}

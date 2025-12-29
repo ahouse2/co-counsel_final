@@ -6,110 +6,102 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
+from sqlalchemy.orm import Session
+from backend.app.database import get_db
+from backend.app.models.presentation import Presentation
 
 router = APIRouter()
-
-# In-memory storage for presentations (would be database in production)
-_presentations: Dict[str, Dict[str, Any]] = {}
-
 
 class PresentationItem(BaseModel):
     document_id: str
     order: int
     notes: Optional[str] = None
 
-
 class PresentationCreate(BaseModel):
     name: str
     case_id: str
     items: List[PresentationItem] = []
 
-
 class PresentationUpdate(BaseModel):
     name: Optional[str] = None
     items: Optional[List[PresentationItem]] = None
-
 
 class PresentationResponse(BaseModel):
     id: str
     name: str
     case_id: str
     items: List[PresentationItem]
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
+    class Config:
+        from_attributes = True
 
 @router.post("", response_model=PresentationResponse, summary="Create a new presentation")
-async def create_presentation(data: PresentationCreate):
+async def create_presentation(data: PresentationCreate, db: Session = Depends(get_db)):
     """Create a new trial presentation playlist."""
-    presentation_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
-    
-    presentation = {
-        "id": presentation_id,
-        "name": data.name,
-        "case_id": data.case_id,
-        "items": [item.model_dump() for item in data.items],
-        "created_at": now,
-        "updated_at": now
-    }
-    
-    _presentations[presentation_id] = presentation
+    presentation = Presentation(
+        name=data.name,
+        case_id=data.case_id,
+        items=[item.model_dump() for item in data.items]
+    )
+    db.add(presentation)
+    db.commit()
+    db.refresh(presentation)
     return presentation
-
 
 @router.get("", response_model=List[PresentationResponse], summary="List all presentations")
-async def list_presentations(case_id: Optional[str] = None):
+async def list_presentations(case_id: Optional[str] = None, db: Session = Depends(get_db)):
     """List all presentations, optionally filtered by case_id."""
-    presentations = list(_presentations.values())
+    query = db.query(Presentation)
     if case_id:
-        presentations = [p for p in presentations if p["case_id"] == case_id]
-    return presentations
-
+        query = query.filter(Presentation.case_id == case_id)
+    return query.all()
 
 @router.get("/{presentation_id}", response_model=PresentationResponse, summary="Get a presentation")
-async def get_presentation(presentation_id: str):
+async def get_presentation(presentation_id: str, db: Session = Depends(get_db)):
     """Get a specific presentation by ID."""
-    if presentation_id not in _presentations:
+    presentation = db.query(Presentation).filter(Presentation.id == presentation_id).first()
+    if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
-    return _presentations[presentation_id]
-
-
-@router.put("/{presentation_id}", response_model=PresentationResponse, summary="Update a presentation")
-async def update_presentation(presentation_id: str, data: PresentationUpdate):
-    """Update an existing presentation."""
-    if presentation_id not in _presentations:
-        raise HTTPException(status_code=404, detail="Presentation not found")
-    
-    presentation = _presentations[presentation_id]
-    
-    if data.name is not None:
-        presentation["name"] = data.name
-    if data.items is not None:
-        presentation["items"] = [item.model_dump() for item in data.items]
-    
-    presentation["updated_at"] = datetime.utcnow().isoformat()
     return presentation
 
+@router.put("/{presentation_id}", response_model=PresentationResponse, summary="Update a presentation")
+async def update_presentation(presentation_id: str, data: PresentationUpdate, db: Session = Depends(get_db)):
+    """Update an existing presentation."""
+    presentation = db.query(Presentation).filter(Presentation.id == presentation_id).first()
+    if not presentation:
+        raise HTTPException(status_code=404, detail="Presentation not found")
+    
+    if data.name is not None:
+        presentation.name = data.name
+    if data.items is not None:
+        presentation.items = [item.model_dump() for item in data.items]
+    
+    presentation.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(presentation)
+    return presentation
 
 @router.delete("/{presentation_id}", summary="Delete a presentation")
-async def delete_presentation(presentation_id: str):
+async def delete_presentation(presentation_id: str, db: Session = Depends(get_db)):
     """Delete a presentation."""
-    if presentation_id not in _presentations:
+    presentation = db.query(Presentation).filter(Presentation.id == presentation_id).first()
+    if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
     
-    del _presentations[presentation_id]
+    db.delete(presentation)
+    db.commit()
     return {"status": "deleted", "id": presentation_id}
 
-
 @router.post("/{presentation_id}/reorder", response_model=PresentationResponse, summary="Reorder items")
-async def reorder_items(presentation_id: str, item_order: List[str]):
+async def reorder_items(presentation_id: str, item_order: List[str], db: Session = Depends(get_db)):
     """Reorder items in a presentation by document IDs."""
-    if presentation_id not in _presentations:
+    presentation = db.query(Presentation).filter(Presentation.id == presentation_id).first()
+    if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
     
-    presentation = _presentations[presentation_id]
-    items = presentation["items"]
+    items = presentation.items
     
     # Create a mapping of document_id to item
     item_map = {item["document_id"]: item for item in items}
@@ -122,6 +114,11 @@ async def reorder_items(presentation_id: str, item_order: List[str]):
             item["order"] = i
             new_items.append(item)
     
-    presentation["items"] = new_items
-    presentation["updated_at"] = datetime.utcnow().isoformat()
+    # Explicitly assign to trigger SQLAlchemy change detection for JSON types if needed
+    # (though typically reassigning the whole list works)
+    presentation.items = new_items
+    presentation.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(presentation)
     return presentation

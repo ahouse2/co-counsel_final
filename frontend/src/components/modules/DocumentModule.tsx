@@ -463,6 +463,7 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
     // Sparkline Component
     const Sparkline = ({ data, width = 120, height = 40, color = "#00f0ff" }: { data: number[], width?: number, height?: number, color?: string }) => {
         // eslint-disable-next-line react/forbid-component-props -- CSS custom properties require style prop
+        // eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop
         if (data.length < 2) return <div style={{ '--w': `${width}px`, '--h': `${height}px` } as React.CSSProperties} className="dynamic-sparkline-size bg-halo-card/30 rounded flex items-center justify-center text-[10px] text-halo-muted">WAITING FOR DATA</div>;
 
         const max = Math.max(...data, 0.1); // Avoid div by zero
@@ -652,7 +653,7 @@ export function DocumentModule({ caseId }: DocumentModuleProps) {
                                         ({uploadManager.state.totalFiles - uploadManager.state.completedFiles} left)
                                     </span>
                                     <div className="w-full h-1 bg-halo-card rounded-full overflow-hidden mt-1">
-                                        {/* eslint-disable-next-line react/forbid-component-props -- CSS custom properties require style prop */}
+                                        {/* eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop */}
                                         <div
                                             className="h-full bg-halo-cyan transition-all duration-300 ease-out dynamic-progress"
                                             style={{

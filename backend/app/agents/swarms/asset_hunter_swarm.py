@@ -133,42 +133,69 @@ class PropertySearchAgent(AssetAgent):
             return AssetAgentResult(self.name, False, {"error": str(e)}, 0)
 
 
+
+import json
+import os
+from backend.app.services.crypto_service import CryptoService
+
+# ... (imports remain the same)
+
 class CryptoTracingAgent(AssetAgent):
-    """Agent 3: Traces cryptocurrency transactions."""
+    """Agent 3: Traces cryptocurrency transactions using CryptoService."""
     
     def __init__(self, llm_service: LLMService, kg_service: KnowledgeGraphService):
         super().__init__(llm_service, kg_service, "CryptoTracingAgent")
+        self.crypto_service = CryptoService()
     
     async def investigate(self, target: str, context: Dict[str, Any]) -> AssetAgentResult:
         try:
             case_id = context.get("case_id", "default")
             
-            # Query KG for crypto addresses
+            # 1. Query KG for known wallets
             crypto_query = """
             MATCH (e:Entity)-[:HAS_WALLET]->(w:CryptoWallet)
             WHERE e.name CONTAINS $target OR e.case_id = $case_id
-            RETURN w.address as address, w.blockchain as chain, w.balance as balance
+            RETURN w.address as address, w.blockchain as chain
             """
             wallets = await self.kg_service.run_cypher_query(crypto_query, {
                 "target": target, "case_id": case_id
             })
             
             results = {
-                "wallets_found": wallets or [],
-                "blockchains": list(set([w.get("chain", "unknown") for w in (wallets or [])])),
-                "total_balance": sum([w.get("balance", 0) for w in (wallets or []) if isinstance(w.get("balance"), (int, float))])
+                "wallets_found": [],
+                "traces": [],
+                "total_risk_score": 0.0
             }
+
+            # 2. If wallets found in KG, trace them
+            if wallets:
+                for w in wallets:
+                    address = w.get("address")
+                    chain = w.get("chain", "BTC")
+                    trace = self.crypto_service.trace_address(address, chain)
+                    
+                    # Add AI analysis
+                    if "error" not in trace:
+                        trace["ai_analysis"] = await self.crypto_service.analyze_with_llm(trace)
+                        results["traces"].append(trace)
+                        results["total_risk_score"] = max(results["total_risk_score"], trace.get("risk_score", 0))
+                
+                results["wallets_found"] = wallets
             
+            # 3. If no wallets, ask LLM to infer from context (e.g. "sent 5 BTC")
+            # (Skipped for now to keep it focused on real tracing)
+
             return AssetAgentResult(
                 agent_name=self.name,
                 success=True,
                 output=results,
-                findings_count=len(wallets or [])
+                findings_count=len(results["traces"])
             )
             
         except Exception as e:
             logger.error(f"{self.name} failed: {e}")
             return AssetAgentResult(self.name, False, {"error": str(e)}, 0)
+
 
 
 class FinancialDiscrepancyAgent(AssetAgent):
@@ -179,42 +206,78 @@ class FinancialDiscrepancyAgent(AssetAgent):
     
     async def investigate(self, target: str, context: Dict[str, Any]) -> AssetAgentResult:
         try:
-            # Gather financial data from KG
-            financial_query = """
-            MATCH (e:Entity {name: $target})-[:HAS_INCOME|HAS_EXPENSE|HAS_ASSET]->(f)
-            RETURN labels(f)[0] as type, f.amount as amount, f.description as description
-            """
-            financials = await self.kg_service.run_cypher_query(financial_query, {"target": target})
+            # 1. Calculate Total Asset Value (Properties + Crypto)
+            properties = context.get("properties", {}).get("properties", [])
+            crypto_traces = context.get("crypto", {}).get("traces", [])
             
-            # Analyze with LLM
-            prompt = f"""Analyze this financial data for income/lifestyle discrepancies.
+            total_property_value = sum([p.get("value", 0) for p in properties if isinstance(p.get("value"), (int, float))])
+            total_crypto_value = sum([t.get("final_balance", 0) * 60000 for t in crypto_traces if t.get("chain") == "BTC"]) # Approx BTC price
+            # Add ETH value logic if needed
+            
+            total_known_assets = total_property_value + total_crypto_value
 
-TARGET: {target}
-
-FINANCIAL DATA:
-{chr(10).join([f"- {f.get('type')}: ${f.get('amount', 0):,.2f} - {f.get('description', '')}" for f in (financials or [])[:15]])}
-
-Identify:
-1. Income vs spending gaps
-2. Unexplained wealth
-3. Hidden income sources
-4. Lavish lifestyle inconsistent with declared income
-
-Return JSON:
-{{
-    "discrepancies": [{{"type": "...", "description": "...", "estimated_gap": 0}}],
-    "red_flags": ["flag1"],
-    "risk_score": 0.0-1.0
-}}"""
-
+            # 2. Search KG for Income/Employment Data
+            income_query = """
+            MATCH (p:Person {name: $target})-[:HAS_INCOME|EMPLOYED_BY]->(source)
+            RETURN source.name as source, source.amount as amount, source.position as position
+            """
+            income_records = await self.kg_service.run_cypher_query(income_query, {"target": target})
+            
+            known_income = 0
+            income_sources = []
+            if income_records:
+                for rec in income_records:
+                    amt = rec.get("amount", 0)
+                    if isinstance(amt, (int, float)):
+                        known_income += amt
+                    income_sources.append(f"{rec.get('position')} at {rec.get('source')} (${amt:,})")
+            
+            # 3. Search Timeline for Financial Events (Salary, Deposits)
+            # We can use the context's case_id to query timeline service if we had access, 
+            # but for now we'll rely on what the swarm might have gathered or KG.
+            
+            prompt = f"""
+            Analyze financial discrepancy for target: {target}
+            
+            ASSETS DETECTED:
+            - Real Estate: ${total_property_value:,.2f}
+            - Crypto Assets: ${total_crypto_value:,.2f}
+            - Total Known Assets: ${total_known_assets:,.2f}
+            
+            KNOWN INCOME SOURCES:
+            {chr(10).join(income_sources) if income_sources else "- None found in records"}
+            (Total Annual Income: ${known_income:,.2f})
+            
+            CONTEXT FROM CRYPTO TRACING:
+            {json.dumps(context.get("crypto", {}).get("flags", []), indent=2)}
+            
+            TASK:
+            Compare the total asset value against the known income. 
+            If assets >>> income (e.g. 10x), flag as HIGH risk "Unexplained Wealth".
+            If crypto usage is high but no tech background, flag as suspicious.
+            
+            Return JSON:
+            {{
+                "discrepancies": [
+                    {{"description": "...", "severity": "high|medium|low", "evidence": "Assets ($X) vs Income ($Y)"}}
+                ],
+                "risk_score": 0.0 to 1.0
+            }}
+            """
+            
             response = await self.llm_service.generate_text(prompt)
-            import json, re
+            import re
             match = re.search(r'\{.*\}', response, re.DOTALL)
+            data = {}
             if match:
                 data = json.loads(match.group())
-                return AssetAgentResult(self.name, True, data, len(data.get("discrepancies", [])))
             
-            return AssetAgentResult(self.name, True, {"discrepancies": [], "risk_score": 0}, 0)
+            return AssetAgentResult(
+                agent_name=self.name,
+                success=True,
+                output=data,
+                findings_count=len(data.get("discrepancies", []))
+            )
             
         except Exception as e:
             logger.error(f"{self.name} failed: {e}")
@@ -222,10 +285,25 @@ Return JSON:
 
 
 class SchemeDetectorAgent(AssetAgent):
-    """Agent 5: Detects asset hiding schemes."""
+    """Agent 5: Detects asset hiding schemes using Forensic Playbook."""
     
     def __init__(self, llm_service: LLMService, kg_service: KnowledgeGraphService):
         super().__init__(llm_service, kg_service, "SchemeDetectorAgent")
+        self.knowledge_base = self._load_knowledge_base()
+
+    def _load_knowledge_base(self) -> List[Dict[str, Any]]:
+        """Loads the asset schemes knowledge base."""
+        try:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            kb_path = os.path.join(base_path, "knowledge", "asset_schemes.json")
+            
+            if os.path.exists(kb_path):
+                with open(kb_path, "r") as f:
+                    return json.load(f)
+            return []
+        except Exception as e:
+            logger.error(f"Error loading asset knowledge base: {e}")
+            return []
     
     async def investigate(self, target: str, context: Dict[str, Any]) -> AssetAgentResult:
         try:
@@ -233,8 +311,8 @@ class SchemeDetectorAgent(AssetAgent):
             properties = context.get("properties", {}).get("properties", [])
             discrepancies = context.get("discrepancies", {}).get("discrepancies", [])
             
-            # Known scheme patterns
-            schemes = [
+            # Use loaded schemes or fallback
+            schemes = self.knowledge_base if self.knowledge_base else [
                 {"name": "Trust Scheme", "indicators": ["trust", "beneficiary", "trustee"]},
                 {"name": "Shell Company", "indicators": ["llc", "inc", "offshore", "delaware"]},
                 {"name": "Nominee Ownership", "indicators": ["family member", "employee", "relative"]},
@@ -246,14 +324,33 @@ class SchemeDetectorAgent(AssetAgent):
             # Check entities for scheme patterns
             for entity in entities:
                 entity_name = entity.get("name", "").lower()
+                entity_type = entity.get("type", "").lower()
+                
                 for scheme in schemes:
-                    if any(ind in entity_name for ind in scheme["indicators"]):
+                    indicators = scheme.get("indicators", [])
+                    matched_indicators = [ind for ind in indicators if ind in entity_name or ind in entity_type]
+                    
+                    if matched_indicators:
                         detected_schemes.append({
-                            "scheme": scheme["name"],
+                            "scheme": scheme.get("name"),
                             "entity": entity.get("name"),
-                            "indicators_matched": [ind for ind in scheme["indicators"] if ind in entity_name]
+                            "indicators_matched": matched_indicators,
+                            "description": scheme.get("description", "Potential asset hiding scheme detected.")
                         })
             
+            # Also check discrepancies for scheme indicators
+            for disc in discrepancies:
+                desc = disc.get("description", "").lower()
+                for scheme in schemes:
+                     indicators = scheme.get("indicators", [])
+                     if any(ind in desc for ind in indicators):
+                         detected_schemes.append({
+                            "scheme": scheme.get("name"),
+                            "entity": "Financial Discrepancy",
+                            "indicators_matched": [ind for ind in indicators if ind in desc],
+                            "description": f"Discrepancy matches scheme: {disc.get('description')}"
+                        })
+
             return AssetAgentResult(
                 agent_name=self.name,
                 success=True,
@@ -268,6 +365,9 @@ class SchemeDetectorAgent(AssetAgent):
         except Exception as e:
             logger.error(f"{self.name} failed: {e}")
             return AssetAgentResult(self.name, False, {"error": str(e)}, 0)
+
+# ... (AssetHunterSwarm class remains mostly the same, just ensuring it uses these updated classes)
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -289,7 +389,43 @@ class AssetHunterSwarm:
         self.discrepancy_detector = FinancialDiscrepancyAgent(self.llm_service, self.kg_service)
         self.scheme_detector = SchemeDetectorAgent(self.llm_service, self.kg_service)
         
+        self.scheme_detector = SchemeDetectorAgent(self.llm_service, self.kg_service)
+        
+        # For target discovery
+        from backend.app.services.timeline import get_timeline_service
+        self.timeline_service = get_timeline_service()
+        
         logger.info("AssetHunterSwarm initialized with 5 agents")
+
+    async def run_investigation(self, case_id: str) -> Dict[str, Any]:
+        """
+        Scans the case timeline to identify a primary target, then runs the swarm.
+        """
+        # 1. Identify Target from Timeline
+        try:
+            timeline_result = self.timeline_service.list_events(case_id)
+            events = timeline_result.events if timeline_result else []
+            
+            # Simple heuristic: Look for names in financial events
+            financial_keywords = ["bank", "transfer", "trust", "llc", "offshore", "crypto", "bitcoin", "wire"]
+            relevant_events = [e for e in events if any(k in e.summary.lower() for k in financial_keywords)]
+            
+            target = "Unknown Subject"
+            if relevant_events:
+                # Ask LLM to extract the primary financial subject
+                context_text = "\n".join([f"- {e.summary}" for e in relevant_events[:20]])
+                prompt = f"Extract the name of the primary person or entity involved in these financial events:\n{context_text}\nReturn ONLY the name."
+                target = await self.llm_service.generate_text(prompt)
+                target = target.strip().strip('"').strip("'")
+            
+            logger.info(f"Identified primary target for asset hunt: {target}")
+            
+        except Exception as e:
+            logger.error(f"Target identification failed: {e}")
+            target = "Case Subject"
+
+        # 2. Run Swarm on Target
+        return await self.investigate(target, case_id)
     
     async def investigate(self, target: str, case_id: str) -> Dict[str, Any]:
         """Run full asset investigation."""

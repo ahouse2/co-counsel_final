@@ -57,6 +57,10 @@ interface HaloContextType {
     cases: CaseInfo[];
     refreshCases: () => Promise<void>;
     createCase: (name: string, description?: string) => Promise<CaseInfo | null>;
+
+    // Proactive Insights
+    insights: any[];
+    refreshInsights: () => Promise<void>;
 }
 
 const HaloContext = createContext<HaloContextType | undefined>(undefined);
@@ -112,6 +116,27 @@ export function HaloProvider({ children }: { children: ReactNode }) {
         refreshCases();
     }, [refreshCases]);
 
+    // Insights state
+    const [insights, setInsights] = useState<any[]>([]);
+
+    // Fetch insights
+    const refreshInsights = useCallback(async () => {
+        if (!caseId) return;
+        try {
+            const response = await endpoints.insights.get(caseId);
+            setInsights(response.data.insights || []);
+        } catch (error) {
+            console.error('Failed to fetch insights:', error);
+        }
+    }, [caseId]);
+
+    // Poll for insights
+    useEffect(() => {
+        refreshInsights();
+        const interval = setInterval(refreshInsights, 30000); // Poll every 30s
+        return () => clearInterval(interval);
+    }, [refreshInsights]);
+
     return (
         <HaloContext.Provider value={{
             activeModule,
@@ -126,7 +151,9 @@ export function HaloProvider({ children }: { children: ReactNode }) {
             setCaseId,
             cases,
             refreshCases,
-            createCase
+            createCase,
+            insights,
+            refreshInsights
         }}>
             {children}
         </HaloContext.Provider>

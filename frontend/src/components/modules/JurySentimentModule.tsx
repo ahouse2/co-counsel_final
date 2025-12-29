@@ -150,6 +150,7 @@ export function JurySentimentModule({ caseId }: { caseId?: string }) {
                                     onChange={(e) => setJuryProfile({ ...juryProfile, age_range: e.target.value })}
                                     className="w-full bg-black/50 border border-halo-border rounded px-3 py-2 text-sm mt-1"
                                     title="Select age range"
+                                    aria-label="Select age range"
                                 >
                                     <option value="18-34">18-34</option>
                                     <option value="35-55">35-55</option>
@@ -163,6 +164,7 @@ export function JurySentimentModule({ caseId }: { caseId?: string }) {
                                     onChange={(e) => setJuryProfile({ ...juryProfile, education: e.target.value })}
                                     className="w-full bg-black/50 border border-halo-border rounded px-3 py-2 text-sm mt-1"
                                     title="Select education level"
+                                    aria-label="Select education level"
                                 >
                                     <option value="high_school">High School</option>
                                     <option value="college">College</option>
@@ -176,6 +178,7 @@ export function JurySentimentModule({ caseId }: { caseId?: string }) {
                                     onChange={(e) => setJuryProfile({ ...juryProfile, political_leaning: e.target.value })}
                                     className="w-full bg-black/50 border border-halo-border rounded px-3 py-2 text-sm mt-1"
                                     title="Select political leaning"
+                                    aria-label="Select political leaning"
                                 >
                                     <option value="liberal">Liberal</option>
                                     <option value="moderate">Moderate</option>
@@ -242,6 +245,7 @@ export function JurySentimentModule({ caseId }: { caseId?: string }) {
                                         className={`h-full transition-all dynamic-width ${analysis.overall_score >= 0.7 ? 'bg-green-500' :
                                             analysis.overall_score >= 0.4 ? 'bg-yellow-500' : 'bg-red-500'
                                             }`}
+                                        // eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop
                                         style={{ '--score': `${analysis.overall_score * 100}%` } as React.CSSProperties}
                                     />
                                 </div>

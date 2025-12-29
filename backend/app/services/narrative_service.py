@@ -32,23 +32,24 @@ class NarrativeService:
         # KG Integration: Query graph for entities, relationships, and case context
         self.kg_service = kg_service or get_knowledge_graph_service()
 
-    async def generate_narrative(self, case_id: str) -> str:
+    async def generate_narrative(self, case_id: str, perspective: str = "neutral") -> str:
         """
         Generates a coherent narrative summary of the case based on timeline events and key documents.
+        Perspective can be 'neutral', 'prosecution', or 'defense'.
         """
-        logger.info(f"Generating narrative for case {case_id}")
+        logger.info(f"Generating {perspective} narrative for case {case_id}")
         
         # 1. Gather Context
         events = self.timeline_service.get_timeline(case_id)
         documents = self.document_store.list_all_documents(case_id)
         
         # Sort events by date
-        sorted_events = sorted(events, key=lambda x: x.event_date)
+        sorted_events = sorted(events, key=lambda x: x.ts)
         
         # Prepare context string
         context_lines = ["TIMELINE EVENTS:"]
         for event in sorted_events:
-            context_lines.append(f"- {event.event_date}: {event.title} - {event.description}")
+            context_lines.append(f"- {event.ts}: {event.title} - {event.summary}")
         
         # ═══════════════════════════════════════════════════════════════════
         # KG INTEGRATION: Query graph for entities, relationships, and insights
@@ -60,7 +61,6 @@ class NarrativeService:
             
         context_lines.append("\nKEY DOCUMENTS:")
         # Limit to top 20 documents to avoid context window issues for now
-        # Ideally we'd use vector search to find relevant ones, but this is a global summary.
         for doc in documents[:20]: 
             summary = (doc.get("metadata") or {}).get("ai_summary", {}).get("summary", "No summary available")
             context_lines.append(f"- {doc['filename']}: {summary}")
@@ -68,14 +68,25 @@ class NarrativeService:
         context_str = "\n".join(context_lines)
         
         # 2. Construct Prompt
+        perspective_instruction = ""
+        if perspective == "prosecution":
+            perspective_instruction = "Write from the perspective of the PROSECUTION/PLAINTIFF. Emphasize motive, intent, and harm. Connect facts to show liability/guilt."
+        elif perspective == "defense":
+            perspective_instruction = "Write from the perspective of the DEFENSE. Emphasize alternative explanations, lack of evidence, and mitigating factors. Cast doubt on the prosecution's theory."
+        else:
+            perspective_instruction = "Write in a professional, objective, and neutral tone."
+
         prompt = f"""
         You are an expert legal analyst. Your task is to generate a comprehensive narrative summary for a legal case based on the following timeline events and document summaries.
         
+        PERSPECTIVE: {perspective.upper()}
+        {perspective_instruction}
+        
         The narrative should:
-        1. Be written in a professional, objective tone.
-        2. Chronologically weave together the events and evidence.
-        3. Highlight key actors and their actions.
-        4. Identify the central conflict or legal issue.
+        1. Chronologically weave together the events and evidence.
+        2. Highlight key actors and their actions.
+        3. Identify the central conflict or legal issue.
+        4. Be compelling and persuasive (if non-neutral).
         
         CASE CONTEXT:
         {context_str}
@@ -103,7 +114,7 @@ class NarrativeService:
         
         context_lines = ["TIMELINE EVENTS:"]
         for event in events:
-            context_lines.append(f"- [Event ID: {event.id}] {event.event_date}: {event.title} - {event.description}")
+            context_lines.append(f"- [Event ID: {event.id}] {event.ts}: {event.title} - {event.summary}")
             
         context_lines.append("\nDOCUMENTS:")
         for doc in documents[:20]:
@@ -185,11 +196,11 @@ class NarrativeService:
         
         # 1. Gather Context
         events = self.timeline_service.get_timeline(case_id)
-        sorted_events = sorted(events, key=lambda x: x.event_date)
+        sorted_events = sorted(events, key=lambda x: x.ts)
         
         context_lines = ["ORIGINAL TIMELINE:"]
         for event in sorted_events:
-            context_lines.append(f"- {event.event_date}: {event.title} - {event.description}")
+            context_lines.append(f"- {event.ts}: {event.title} - {event.summary}")
         
         context_str = "\n".join(context_lines)
         
@@ -264,7 +275,7 @@ class NarrativeService:
         
         # 1. Gather Timeline Events
         events = self.timeline_service.get_timeline(case_id)
-        sorted_events = sorted(events, key=lambda x: x.event_date)
+        sorted_events = sorted(events, key=lambda x: x.ts)
         
         if not sorted_events:
             return []
@@ -272,7 +283,7 @@ class NarrativeService:
         # 2. Construct Prompt
         event_list = []
         for event in sorted_events:
-            event_list.append(f"- {event.event_date}: {event.title} - {event.description}")
+            event_list.append(f"- {event.ts}: {event.title} - {event.summary}")
         
         events_str = "\n".join(event_list)
         
@@ -319,7 +330,7 @@ class NarrativeService:
                 # Fallback: assign linear tension
                 return [
                     {
-                        "timestamp": str(event.event_date),
+                        "timestamp": str(event.ts),
                         "event": event.title,
                         "tension_level": min(1.0, 0.2 + (i * 0.1))
                     }

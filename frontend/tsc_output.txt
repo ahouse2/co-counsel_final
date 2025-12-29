@@ -1,0 +1,2 @@
+src/components/modules/DevilsAdvocateModule.tsx(3,69): error TS6133: 'FileText' is declared but its value is never read.
+src/components/modules/NarrativeModule.tsx(3,69): error TS6133: 'Scale' is declared but its value is never read.

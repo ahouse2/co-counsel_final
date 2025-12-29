@@ -411,6 +411,7 @@ export function LegalTheoryModule() {
                                                 (cause.confidence || cause.score || 0) > 0.4 ? 'bg-yellow-500' :
                                                     'bg-red-500'
                                                 }`}
+                                            // eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop
                                             style={{ '--score': `${(cause.confidence || cause.score || 0) * 100}%` } as React.CSSProperties}
                                         />
                                     </div>

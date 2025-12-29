@@ -609,16 +609,30 @@ class AutonomousOrchestrator:
             except Exception as e:
                 logger.warning(f"[AUTO] Stage 12 (Simulation) failed: {e}")
             
-            # STAGE 13: Intelligence Synthesis - Generate actionable intelligence report
-            logger.info(f"[AUTO] Stage 13: Generating Intelligence Report...")
+            # STAGE 13: Background Research Agent (The Autonomous Associate)
+            logger.info(f"[AUTO] Stage 13: BackgroundResearchAgent analyzing for gaps...")
+            try:
+                from backend.app.agents.background_research_agent import BackgroundResearchAgent
+                bg_agent = BackgroundResearchAgent()
+                insights = await bg_agent.analyze_case(case_id)
+                logger.info(f"[AUTO] Stage 13 Complete: {len(insights)} proactive insights found")
+                self._log_activity("background_research_complete", f"Insights: {len(insights)}")
+                
+                # Store insights in memory/timeline for now (or broadcast)
+                # In future: Persist to InsightsStore
+            except Exception as e:
+                logger.warning(f"[AUTO] Stage 13 (Background Research) failed: {e}")
+
+            # STAGE 14: Intelligence Synthesis - Generate actionable intelligence report
+            logger.info(f"[AUTO] Stage 14: Generating Intelligence Report...")
             try:
                 from backend.app.services.intelligence_service import IntelligenceService
                 intel_service = IntelligenceService()
                 intel_result = await intel_service.synthesize_case_intelligence(case_id)
-                logger.info(f"[AUTO] Stage 13 Complete: Intelligence report ready")
+                logger.info(f"[AUTO] Stage 14 Complete: Intelligence report ready")
                 self._log_activity("intelligence_report_complete", str(intel_result)[:100])
             except Exception as e:
-                logger.warning(f"[AUTO] Stage 13 (Intelligence Synthesis) failed: {e}")
+                logger.warning(f"[AUTO] Stage 14 (Intelligence Synthesis) failed: {e}")
 
             
             logger.info(f"[AUTO] ═══════════════════════════════════════════════════════")

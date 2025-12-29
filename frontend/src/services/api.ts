@@ -4,7 +4,7 @@ import axios from 'axios';
 const api = axios.create({
     // In development (Vite), this is proxied to http://localhost:8000
     // In production (Nginx), this is proxied to the backend service
-    baseURL: '/',
+    baseURL: '',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -115,7 +115,7 @@ export const endpoints = {
         list: (page = 1, pageSize = 10) => api.get(`/api/timeline?page=${page}&page_size=${pageSize}`),
         generate: (prompt: string, caseId: string) => api.post('/api/timeline/generate', { prompt, case_id: caseId }),
         narrative: {
-            generate: (caseId: string) => api.get(`/api/narrative/${caseId}/generate`),
+            generate: (caseId: string, perspective: string = 'neutral') => api.get(`/api/narrative/${caseId}/generate`, { params: { perspective } }),
             contradictions: (caseId: string) => api.get(`/api/narrative/${caseId}/contradictions`),
             branching: (caseId: string, pivot: string, fact: string) => api.post(`/api/narrative/${caseId}/branching`, { pivot_point: pivot, alternative_fact: fact }),
             storyArc: (caseId: string) => api.get(`/api/narrative/${caseId}/story_arc`),
@@ -188,6 +188,7 @@ export const endpoints = {
     // Devil's Advocate
     devilsAdvocate: {
         review: (caseId: string, caseTheory: string = "") => api.post(`/api/devils-advocate/${caseId}/review`, { case_theory: caseTheory }),
+        critique: (caseId: string, narrativeText: string, perspective: string) => api.post('/api/devils-advocate/critique', { case_id: caseId, narrative_text: narrativeText, perspective }),
         crossExamine: (statement: string, profile: string = "") => api.post('/api/devils-advocate/cross-examine', { witness_statement: statement, witness_profile: profile }),
         motionToDismiss: (caseId: string, grounds: string[]) => api.post(`/api/devils-advocate/${caseId}/motion_to_dismiss`, { grounds }),
         evidenceGraph: (caseId: string) => api.get(`/api/devils-advocate/${caseId}/evidence_graph`),
@@ -330,6 +331,11 @@ export const endpoints = {
         refresh: (refreshToken: string) => api.post('/api/token/refresh', { refresh_token: refreshToken }),
         forgotPassword: (email: string) => api.post('/api/forgot-password', { email }),
         resetPassword: (token: string, newPassword: string) => api.post('/api/reset-password', { token, new_password: newPassword }),
+    },
+    // Proactive Insights
+    insights: {
+        get: (caseId: string) => api.get(`/api/insights/${caseId}`),
+        add: (caseId: string, insight: any) => api.post(`/api/insights/${caseId}`, insight),
     }
 };
 

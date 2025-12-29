@@ -60,14 +60,14 @@ export function AssetHunterModule() {
             setCryptoResult(response.data);
         } catch (error) {
             console.error("Trace failed:", error);
-            // Fallback for demo if API fails
             setCryptoResult({
                 address,
                 chain,
-                risk_score: 0.85,
-                flags: ['Interaction with Mixer', 'High Velocity', 'Structuring'],
-                attributed_clusters: ['Lazarus Group', 'DarkWeb Market'],
-                graph: { nodes: [{ id: 'Target', group: 'target' }, { id: 'Mixer', group: 'mixer' }], links: [{ source: 'Target', target: 'Mixer' }] }
+                risk_score: 0,
+                flags: [],
+                attributed_clusters: [],
+                graph: { nodes: [], links: [] },
+                error: "Trace failed. Please check the address and try again."
             });
         } finally {
             setLoading(false);
@@ -78,18 +78,82 @@ export function AssetHunterModule() {
         setLoading(true);
         try {
             const response = await endpoints.financial.scanAssets(caseId);
-            setAssetResult(response.data);
+            const data = response.data;
+
+            // Map backend swarm result to frontend format
+            const assets: any[] = [];
+
+            // 1. Map Properties
+            if (data.properties?.properties) {
+                data.properties.properties.forEach((p: any) => {
+                    assets.push({
+                        type: 'Real Estate',
+                        entity: p.address,
+                        value: p.value ? `$${p.value.toLocaleString()}` : 'Unknown',
+                        suspicion_level: 'Medium',
+                        reason: 'Identified via Property Search',
+                        jurisdiction: 'Unknown'
+                    });
+                });
+            }
+
+            // 2. Map Entities (Shell Companies, Trusts)
+            if (data.entities?.related_entities) {
+                data.entities.related_entities.forEach((e: any) => {
+                    assets.push({
+                        type: e.type || 'Entity',
+                        entity: e.name,
+                        value: 'Unknown',
+                        suspicion_level: e.suspicion_level || 'Medium',
+                        reason: e.reason || 'Related Entity',
+                        jurisdiction: 'Unknown'
+                    });
+                });
+            }
+
+            // 3. Map Schemes
+            if (data.schemes?.detected_schemes) {
+                data.schemes.detected_schemes.forEach((s: any) => {
+                    // Avoid duplicates if already added via entities
+                    if (!assets.find(a => a.entity === s.entity)) {
+                        assets.push({
+                            type: s.scheme,
+                            entity: s.entity,
+                            value: 'Unknown',
+                            suspicion_level: 'High',
+                            reason: s.description,
+                            jurisdiction: 'Unknown'
+                        });
+                    }
+                });
+            }
+
+            // 4. Map Crypto
+            if (data.crypto?.wallets_found) {
+                data.crypto.wallets_found.forEach((w: any) => {
+                    assets.push({
+                        type: 'Crypto Wallet',
+                        entity: w.address,
+                        value: 'Unknown',
+                        suspicion_level: 'High',
+                        reason: 'Linked Crypto Wallet',
+                        jurisdiction: 'Global'
+                    });
+                });
+            }
+
+            setAssetResult({
+                assets,
+                risk_score: data.schemes?.risk_level === 'high' ? 0.9 : 0.5,
+                summary: `Asset Hunter Swarm completed investigation on target: ${data.target}. Found ${data.total_findings} potential assets/risks.`
+            });
+
         } catch (error) {
             console.error("Scan failed:", error);
-            // Fallback for demo
             setAssetResult({
-                summary: "Analysis indicates a high probability of concealed assets. Multiple transfers to entities in high-risk jurisdictions (Cayman Islands, Panama) detected shortly before litigation commenced.",
-                risk_score: 0.92,
-                assets: [
-                    { type: 'Real Estate', entity: 'Panama Holdings Ltd.', value: '$2.5M', suspicion_level: 'High', reason: 'Purchased via shell company', jurisdiction: 'Panama' },
-                    { type: 'Bank Account', entity: 'Credit Suisse', value: '$500k', suspicion_level: 'Medium', reason: 'Undisclosed foreign account', jurisdiction: 'Switzerland' },
-                    { type: 'Crypto', entity: 'Ledger Wallet', value: '$1.2M', suspicion_level: 'High', reason: 'Linked to mixer transactions', jurisdiction: 'Global' }
-                ]
+                summary: "Error scanning assets. Please try again.",
+                risk_score: 0,
+                assets: []
             });
         } finally {
             setLoading(false);

@@ -49,7 +49,7 @@ class DevilsAdvocateService:
         
         context_lines = ["TIMELINE:"]
         for event in events:
-            context_lines.append(f"- {event.event_date}: {event.title} - {event.description}")
+            context_lines.append(f"- {event.ts}: {event.title} - {event.summary}")
             
         context_lines.append("\nKEY EVIDENCE:")
         for doc in documents[:15]:
@@ -173,6 +173,64 @@ class DevilsAdvocateService:
         except Exception as e:
             logger.error(f"Cross-exam generation failed: {e}")
             return []
+
+    async def critique_narrative(self, case_id: str, narrative_text: str, perspective: str) -> Dict[str, Any]:
+        """
+        Critiques a specific narrative (e.g., Prosecution's story) from the opposing side.
+        """
+        try:
+            # 1. Determine Opposing Role
+            opposing_role = "DEFENSE" if perspective.lower() == "prosecution" else "PROSECUTION"
+            
+            # 2. Construct Prompt
+            prompt = f"""
+            You are the lead {opposing_role} counsel. You are ruthless, logical, and highly skilled.
+            
+            OPPOSING NARRATIVE:
+            {narrative_text}
+            
+            YOUR TASK:
+            Tear this narrative apart. Find every weak link, every assumption, and every lack of evidence.
+            
+            Identify 3-5 key points to attack. For each point:
+            1. Quote the specific claim.
+            2. Provide the counter-argument.
+            3. Suggest a strategy (e.g., "Move to suppress", "Impeach witness").
+            
+            Return JSON:
+            {{
+                "critique_summary": "General assessment of the opposing case strength...",
+                "weaknesses": [
+                    {{
+                        "claim": "...",
+                        "counter_argument": "...",
+                        "strategy": "...",
+                        "severity": "high|medium|low"
+                    }}
+                ],
+                "recommended_motion": "e.g. Motion to Dismiss, Motion in Limine"
+            }}
+            """
+            
+            response = await self.llm_service.generate_text(prompt)
+            
+            import re
+            import json
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if match:
+                return json.loads(match.group())
+            
+            # Fallback if regex fails but it's valid JSON
+            try:
+                return json.loads(response)
+            except:
+                pass
+
+            return {"error": "Failed to parse critique"}
+
+        except Exception as e:
+            logger.error(f"Error critiquing narrative: {e}")
+            return {"error": str(e)}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # KNOWLEDGE GRAPH INTEGRATION METHODS

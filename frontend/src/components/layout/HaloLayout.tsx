@@ -1,8 +1,68 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useHalo, ModuleId } from '../../context/HaloContext';
-import { Settings, Menu, Activity } from 'lucide-react';
+import { Settings, Menu, Activity, Bell, AlertTriangle, FileText, Clock } from 'lucide-react';
 import { SettingsPanel } from '../SettingsPanel';
+
+function NotificationsDropdown() {
+    const { insights } = useHalo();
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    return (
+        <>
+            <div
+                className="absolute top-8 right-32 z-50 cursor-pointer hover:text-halo-cyan transition-colors"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <div className="relative flex items-center gap-2">
+                    <span className="text-xs font-mono uppercase tracking-widest">Alerts</span>
+                    <Bell size={24} />
+                    {insights.length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    )}
+                </div>
+            </div>
+
+            {isOpen && (
+                <div className="absolute top-20 right-32 z-[60] bg-black/95 border border-halo-cyan/30 rounded-lg p-4 w-96 max-h-[80vh] overflow-y-auto shadow-[0_0_20px_rgba(0,240,255,0.2)] backdrop-blur-md">
+                    <h3 className="text-halo-cyan font-mono text-sm mb-4 border-b border-halo-cyan/20 pb-2">
+                        PROACTIVE INSIGHTS ({insights.length})
+                    </h3>
+
+                    {insights.length === 0 ? (
+                        <div className="text-halo-muted text-xs font-mono py-4 text-center">
+                            No active alerts. System monitoring...
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-4">
+                            {insights.map((insight, idx) => (
+                                <div key={idx} className="bg-halo-cyan/5 border border-halo-cyan/10 rounded p-3 hover:bg-halo-cyan/10 transition-colors">
+                                    <div className="flex items-start gap-3">
+                                        {insight.type === 'gap' && <Clock size={16} className="text-yellow-400 mt-1 shrink-0" />}
+                                        {insight.type === 'missing_evidence' && <FileText size={16} className="text-red-400 mt-1 shrink-0" />}
+                                        {insight.type === 'contradiction' && <AlertTriangle size={16} className="text-orange-400 mt-1 shrink-0" />}
+
+                                        <div>
+                                            <div className="text-xs font-bold text-halo-text mb-1 uppercase tracking-wider">
+                                                {insight.type.replace('_', ' ')}
+                                            </div>
+                                            <div className="text-sm text-halo-text/90 mb-2 leading-relaxed">
+                                                {insight.description}
+                                            </div>
+                                            <div className="text-xs font-mono text-halo-cyan bg-halo-cyan/10 px-2 py-1 rounded inline-block">
+                                                ACTION: {insight.action_item}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </>
+    );
+}
 
 // Module definitions - Complete list from Halo spec
 const PRIMARY_MODULES: { id: ModuleId; label: string }[] = [
@@ -213,6 +273,9 @@ export function HaloLayout({ children }: { children: React.ReactNode }) {
                 </div>
             )}
 
+            {/* Notifications Bell */}
+            <NotificationsDropdown />
+
             <div
                 className="absolute bottom-8 right-8 z-50 cursor-pointer hover:text-halo-cyan transition-colors"
                 onClick={() => setIsSettingsOpen(true)}
@@ -257,7 +320,7 @@ export function HaloLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Primary Module Nodes (Left Perimeter) */}
                 {primaryNodes.map((node) => (
-                    // eslint-disable-next-line react/forbid-component-props -- CSS custom properties require style prop
+                    // eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop
                     <div
                         key={node.id}
                         className={`absolute w-4 h-4 -ml-2 -mt-2 rounded-full border cursor-pointer transition-all duration-300 z-50 group halo-node-position
@@ -293,7 +356,7 @@ export function HaloLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Submodule Nodes (Right Perimeter) */}
                 {subNodes.map((node) => (
-                    // eslint-disable-next-line react/forbid-component-props -- CSS custom properties require style prop
+                    // eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop
                     <div
                         key={node.id}
                         className={`absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border cursor-pointer transition-all duration-300 z-50 group halo-node-position

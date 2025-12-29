@@ -128,6 +128,7 @@ export function MootCourtModule() {
                             className={`absolute bottom-0 left-0 right-0 transition-all duration-1000 dynamic-height ${riskScore > 0.7 ? 'bg-red-500' :
                                 riskScore > 0.4 ? 'bg-yellow-500' : 'bg-green-500'
                                 }`}
+                            // eslint-disable-next-line react/forbid-dom-props -- CSS custom properties require style prop
                             style={{ '--risk': `${riskScore * 100}%` } as React.CSSProperties}
                         />
                     </div>
