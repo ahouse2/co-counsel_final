@@ -20,8 +20,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt /src/backend/requirements.txt
 RUN pip install uv
 ENV UV_HTTP_TIMEOUT=1200
-RUN uv pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cpu
-RUN uv pip install -r /src/backend/requirements.txt
+RUN uv pip install torch==2.4.0
+RUN uv pip install --prerelease=allow -r /src/backend/requirements.txt
 
 ENV FASTER_WHISPER_CACHE=/models/whisper \
     COQUI_TTS_CACHE=/models/tts
