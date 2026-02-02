@@ -10,11 +10,11 @@ Co-Counsel is a sophisticated, production-ready legal technology platform levera
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-org/co-counsel.git
-cd co-counsel
+git clone https://github.com/ahouse2/co-counsel_final/feature/macos-support.git
+cd co-counsel_final
 cp .env.example .env
 
-# Configure (edit .env with your API keys)
+# Configure (edit .env with your API keys, if required. Can also run local LLM.)
 nano .env
 
 # Start with Docker
